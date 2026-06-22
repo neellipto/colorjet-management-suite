@@ -1,0 +1,13 @@
+{
+  "name": "colorjet-erp",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "artifacts/mobile"
+  ],
+  "scripts": {
+    "dev": "pnpm --filter @workspace/mobile run dev",
+    "build": "pnpm --filter @workspace/mobile run build"
+  }
+}
