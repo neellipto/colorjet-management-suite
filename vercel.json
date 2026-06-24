@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "installCommand": "pnpm install --no-frozen-lockfile",
+  "buildCommand": "pnpm --filter @workspace/mobile run build",
+  "outputDirectory": "artifacts/mobile/static-build",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
