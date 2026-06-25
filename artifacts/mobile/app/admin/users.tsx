@@ -36,7 +36,7 @@ export default function UsersScreen() {
       Alert.alert('Required', 'Enter name, email and a temporary password with at least 12 characters.');
       return;
     }
-    await addUser({ ...form, password: '', isActive: true });
+    await addUser({ ...form, isActive: true });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setForm({ name: '', email: '', phone: '', role: 'engineer', employeeCode: '', department: '', temporaryPassword: '' });
     setModal(false);
