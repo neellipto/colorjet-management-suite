@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '@/context/AppContext';
+import { getSupabase } from '@/lib/supabaseClient';
 import { useColors } from '@/hooks/useColors';
 
 export default function LoginScreen() {
@@ -18,6 +19,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [linkLoading, setLinkLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -32,8 +34,27 @@ export default function LoginScreen() {
       router.replace('/(tabs)');
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Login Failed', 'Invalid email or password.');
+      Alert.alert('Login Failed', 'The email or password does not match this account. Use Secure Email Sign-in if you need access now.');
     }
+  };
+
+  const handleEmailLink = async () => {
+    if (!email.trim()) {
+      Alert.alert('Email required', 'Enter your official email address first.');
+      return;
+    }
+    setLinkLoading(true);
+    const redirectTo = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin : undefined;
+    const { error } = await getSupabase().auth.signInWithOtp({
+      email: email.trim(),
+      options: { emailRedirectTo: redirectTo },
+    });
+    setLinkLoading(false);
+    if (error) {
+      Alert.alert('Unable to send link', error.message);
+      return;
+    }
+    Alert.alert('Check your email', 'A secure sign-in link has been sent. Open it in this browser to enter COLORJET ERP.');
   };
 
   return (
@@ -43,7 +64,6 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
         <View style={styles.header}>
           <View style={styles.logoBox}>
             <Feather name="printer" size={32} color="#1A237E" />
@@ -53,13 +73,11 @@ export default function LoginScreen() {
           <Text style={styles.tagline}>Bangladesh · ERP v2.0</Text>
         </View>
 
-        {/* Card */}
-        <View style={[styles.card, { backgroundColor: colors.card }]}>
+        <View style={[styles.card, { backgroundColor: colors.card }]}> 
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>Sign In</Text>
-          <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>Enter your credentials to continue</Text>
+          <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>Enter your credentials or use a secure email sign-in link.</Text>
 
-          {/* Email */}
-          <View style={[styles.inputWrap, { borderColor: colors.border }]}>
+          <View style={[styles.inputWrap, { borderColor: colors.border }]}> 
             <Feather name="mail" size={16} color={colors.mutedForeground} style={styles.inputIcon} />
             <TextInput
               style={[styles.input, { color: colors.foreground, fontFamily: 'Inter_400Regular' }]}
@@ -73,8 +91,7 @@ export default function LoginScreen() {
             />
           </View>
 
-          {/* Password */}
-          <View style={[styles.inputWrap, { borderColor: colors.border }]}>
+          <View style={[styles.inputWrap, { borderColor: colors.border }]}> 
             <Feather name="lock" size={16} color={colors.mutedForeground} style={styles.inputIcon} />
             <TextInput
               style={[styles.input, { color: colors.foreground, fontFamily: 'Inter_400Regular' }]}
@@ -83,23 +100,31 @@ export default function LoginScreen() {
               placeholder="Password"
               placeholderTextColor={colors.mutedForeground}
               secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              onSubmitEditing={handleLogin}
             />
             <TouchableOpacity onPress={() => setShowPassword(s => !s)} style={styles.eyeBtn}>
               <Feather name={showPassword ? 'eye-off' : 'eye'} size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           </View>
 
-          {/* Login Button */}
           <TouchableOpacity
             style={[styles.loginBtn, { backgroundColor: colors.primary }]}
             onPress={handleLogin}
             activeOpacity={0.85}
-            disabled={loading}
+            disabled={loading || linkLoading}
           >
-            {loading
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.loginBtnText}>Sign In</Text>
-            }
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.loginBtnText}>Sign In</Text>}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.emailLinkBtn, { borderColor: colors.primary }]}
+            onPress={handleEmailLink}
+            activeOpacity={0.85}
+            disabled={loading || linkLoading}
+          >
+            {linkLoading ? <ActivityIndicator color={colors.primary} /> : <><Feather name="send" size={15} color={colors.primary} /><Text style={[styles.emailLinkText, { color: colors.primary }]}>Secure Email Sign-in</Text></>}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -136,4 +161,6 @@ const styles = StyleSheet.create({
     shadowColor: '#1A237E', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4,
   },
   loginBtnText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#fff', letterSpacing: 0.3 },
+  emailLinkBtn: { minHeight: 48, flexDirection: 'row', gap: 8, borderWidth: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  emailLinkText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
 });
