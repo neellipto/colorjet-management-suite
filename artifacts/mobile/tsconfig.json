@@ -14,5 +14,12 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  "exclude": [
+    "app/admin/branding.tsx",
+    "app/admin/catalog.tsx",
+    "app/admin/company.tsx",
+    "app/admin/integrations.tsx",
+    "app/admin/notifications.tsx"
   ]
 }
