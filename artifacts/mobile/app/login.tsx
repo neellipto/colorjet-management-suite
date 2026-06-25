@@ -9,6 +9,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '@/context/AppContext';
 import { getSupabase } from '@/lib/supabaseClient';
+import { productionConfig } from '@/lib/runtimeConfig';
 import { useColors } from '@/hooks/useColors';
 
 export default function LoginScreen() {
@@ -44,10 +45,9 @@ export default function LoginScreen() {
       return;
     }
     setLinkLoading(true);
-    const redirectTo = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin : undefined;
     const { error } = await getSupabase().auth.signInWithOtp({
       email: email.trim(),
-      options: { emailRedirectTo: redirectTo },
+      options: { emailRedirectTo: productionConfig.authRedirectUrl },
     });
     setLinkLoading(false);
     if (error) {
