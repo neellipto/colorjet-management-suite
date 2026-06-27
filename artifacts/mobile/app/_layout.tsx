@@ -7,6 +7,7 @@ import {
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setBaseUrl } from "@workspace/api-client-react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
@@ -89,6 +90,7 @@ export default function RootLayout() {
             <GestureHandlerRootView>
               <KeyboardProvider>
                 <RootLayoutNav />
+                <SpeedInsights />
               </KeyboardProvider>
             </GestureHandlerRootView>
           </AppProvider>
