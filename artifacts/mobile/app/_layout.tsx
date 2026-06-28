@@ -40,6 +40,8 @@ function RootLayoutNav() {
     <Stack screenOptions={{ headerBackTitle: "Back", headerTintColor: "#1A237E" }}>
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="login" options={{ headerShown: false }} />
+      <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
+      <Stack.Screen name="reset-password" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="invoice/[id]" options={{ title: "Invoice Detail", headerBackTitle: "Back" }} />
       <Stack.Screen name="ticket/[id]" options={{ title: "Job Detail", headerBackTitle: "Back" }} />
