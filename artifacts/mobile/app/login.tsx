@@ -35,7 +35,7 @@ export default function LoginScreen() {
       router.replace('/(tabs)');
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Login Failed', 'The email or password does not match this account. Use Secure Email Sign-in if you need access now.');
+      Alert.alert('Login Failed', 'The email or password does not match this account. Use Forgot Password to create a new password.');
     }
   };
 
@@ -54,7 +54,7 @@ export default function LoginScreen() {
       Alert.alert('Unable to send link', error.message);
       return;
     }
-    Alert.alert('Check your email', 'A secure sign-in link has been sent. Open it in this browser to enter COLORJET ERP.');
+    Alert.alert('Check your email', 'A secure sign-in link has been sent. Open it once in Chrome.');
   };
 
   return (
@@ -118,6 +118,10 @@ export default function LoginScreen() {
             {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.loginBtnText}>Sign In</Text>}
           </TouchableOpacity>
 
+          <TouchableOpacity onPress={() => router.push('/forgot-password')} disabled={loading || linkLoading} activeOpacity={0.75}>
+            <Text style={[styles.forgotText, { color: colors.primary }]}>Forgot Password?</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[styles.emailLinkBtn, { borderColor: colors.primary }]}
             onPress={handleEmailLink}
@@ -161,6 +165,7 @@ const styles = StyleSheet.create({
     shadowColor: '#1A237E', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4,
   },
   loginBtnText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#fff', letterSpacing: 0.3 },
+  forgotText: { textAlign: 'center', fontSize: 14, fontFamily: 'Inter_700Bold', paddingVertical: 2 },
   emailLinkBtn: { minHeight: 48, flexDirection: 'row', gap: 8, borderWidth: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   emailLinkText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
 });
