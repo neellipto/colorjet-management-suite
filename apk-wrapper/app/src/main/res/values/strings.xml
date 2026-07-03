@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">COLORJET ERP</string>
+    <string name="erp_url">https://erp.colorjetbd.com/login.php</string>
+    <string name="network_error_title">Internet connection unavailable</string>
+    <string name="network_error_message">Please check your mobile data or Wi-Fi, then tap Retry.</string>
+    <string name="retry">Retry</string>
+    <string name="exit_title">Exit COLORJET ERP?</string>
+    <string name="exit_message">Tap Exit to close the app.</string>
+    <string name="exit">Exit</string>
+    <string name="cancel">Cancel</string>
+</resources>
