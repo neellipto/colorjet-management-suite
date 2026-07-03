@@ -1,0 +1,13 @@
+apply plugin: ['com','android','application'].join('.')
+
+android {
+    namespace 'com.colorjet.fieldservice'
+    compileSdkVersion 35
+    defaultConfig {
+        applicationId 'com.colorjet.fieldservice'
+        minSdkVersion 24
+        targetSdkVersion 35
+        versionCode 1
+        versionName '1.0.0'
+    }
+}
