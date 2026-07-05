@@ -6,6 +6,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Analytics } from "@vercel/analytics/react";
 import { setBaseUrl } from "@workspace/api-client-react";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -91,6 +92,7 @@ export default function RootLayout() {
             <GestureHandlerRootView>
               <KeyboardProvider>
                 <RootLayoutNav />
+                <Analytics />
               </KeyboardProvider>
             </GestureHandlerRootView>
           </AppProvider>
