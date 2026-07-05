@@ -14,4 +14,7 @@ config.resolver.nodeModulesPaths = [
   path.resolve(workspaceRoot, 'node_modules/.pnpm/node_modules'),
 ];
 
+// Enable unstable package exports support for @vercel/speed-insights
+config.resolver.unstable_enablePackageExports = true;
+
 module.exports = config;
