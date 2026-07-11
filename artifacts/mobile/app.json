@@ -1,11 +1,11 @@
 {
   "expo": {
     "name": "COLORJET ERP",
-    "slug": "mobile",
+    "slug": "colorjet-erp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "colorjeterp",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/images/splash.png",
@@ -13,24 +13,32 @@
       "backgroundColor": "#1A237E"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "bd.com.colorjet.erp"
     },
-    "android": {},
+    "android": {
+      "package": "bd.com.colorjet.erp",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "permissions": [
+        "INTERNET",
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "POST_NOTIFICATIONS"
+      ]
+    },
     "web": {
       "favicon": "./assets/images/favicon.png",
       "bundler": "metro"
     },
     "plugins": [
-      [
-        "expo-router",
-        {
-          "origin": "https://replit.com/"
-        }
-      ],
-      "expo-font"
+      ["expo-router", {"origin": "https://erp.colorjetbd.com"}],
+      "expo-font",
+      ["expo-image-picker", {"photosPermission": "Allow COLORJET ERP to attach service and job photos.", "cameraPermission": "Allow COLORJET ERP to take service and job photos."}]
     ],
-    "experiments": {
-      "typedRoutes": true
-    }
+    "experiments": {"typedRoutes": true}
   }
 }
