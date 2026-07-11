@@ -1,89 +1,37 @@
-# COLORJET ERP / Odoo Sync Repository Stack Audit
+# COLORJET ERP Repository Audit
 
-## Audit date
-- 2026-06-18 UTC
+Audit date: 2026-07-11 UTC  
+Target: `neellipto/colorjet-management-suite`
 
-## Repository status
-- Repository path: `/workspace/colorjet-management-suite`
-- Current branch: `work`
-- Source files found: none, except `.gitkeep` and Git metadata.
-- No existing application source was deleted, reset, overwritten, or scaffolded.
-- No secrets were printed or committed.
+## Executive finding
 
-## Identified stack
-| Area | Result |
-|---|---|
-| Frontend framework | Not detected |
-| Backend framework | Not detected |
-| Mobile app / WebView source | Not detected |
-| Odoo sync implementation | Not detected |
-| Queue / retry worker | Not detected |
-| Database ORM / migration tool | Not detected |
-| Test framework | Not detected |
-| Build tool | Not detected |
-| Package manager | Not detected |
-| Runtime version files | Not detected |
+The repository is not empty. Its primary runnable application is an Expo 51 / React Native 0.74 / Expo Router monorepo application under `artifacts/mobile`, with web export support and Supabase authentication. A separate native Android WebView wrapper also exists under `apk-wrapper`.
 
-## Package manager detection
-No package manager lockfile or manifest was found:
+## Detected stack
 
-- No `package.json`
-- No `package-lock.json`
-- No `pnpm-lock.yaml`
-- No `yarn.lock`
-- No `composer.json`
-- No `requirements.txt`
-- No `pyproject.toml`
-- No `Pipfile`
-- No `go.mod`
-- No `Cargo.toml`
-- No `.csproj` / `.sln`
+| Area | Finding | Status |
+|---|---|---|
+| Workspace | pnpm monorepo | Working |
+| Mobile UI | Expo 51, React Native 0.74, Expo Router | Working/needs CI proof |
+| Web/PWA | Expo web with custom build script | Present |
+| Authentication | Supabase Auth | Present |
+| Android identity | `bd.com.colorjet.erp` | Added |
+| Android CI | GitHub Actions debug APK | Added |
+| Signed AAB | Tag-only workflow using GitHub Secrets | Configured, secrets required |
+| Firebase/FCM | Not verified in inspected configuration | Missing/unverified |
+| Tests | No dedicated test script detected | Missing |
+| Lint | No lint script detected | Missing |
+| Legacy wrapper | `apk-wrapper` WebView app | Duplicate delivery path; preserve pending decision |
 
-## Build commands
-No build commands are available because no project manifest was found.
+## Critical findings
 
-## Test commands
-No test commands are available because no test framework or project manifest was found.
+1. `PROJECT_STACK.md` incorrectly reported an empty repository; the document is stale.
+2. Expo Android package, versionCode and permissions were absent.
+3. No `.github/workflows/android-build.yml` existed.
+4. Production release signing secrets are not present by design and must be configured in GitHub.
+5. Firebase Cloud Messaging cannot be claimed complete from current evidence.
+6. Existing Supabase variables must remain in GitHub/Vercel secrets and must never be committed.
 
-## Database config
-No database configuration file was found.
+## Safe implementation decision
 
-Expected production-grade ERP/backend database config should be environment-driven, for example:
-
-- `DATABASE_URL`
-- `DB_HOST`
-- `DB_PORT`
-- `DB_NAME`
-- `DB_USER`
-- `DB_PASSWORD`
-- `DB_SSL_MODE`
-
-## Odoo sync config
-No Odoo sync code or config was found.
-
-Expected backend-only Odoo sync config should use environment variables, never mobile app hardcoding:
-
-- `ODOO_URL`
-- `ODOO_DB`
-- `ODOO_USERNAME`
-- `ODOO_API_KEY`
-- `ODOO_SYNC_ENABLED`
-- `ODOO_SYNC_QUEUE_NAME`
-
-## Deployment files
-No deployment files were found:
-
-- No `Dockerfile`
-- No `docker-compose.yml`
-- No `.github/workflows/*`
-- No `Procfile`
-- No `render.yaml`
-- No `vercel.json`
-- No `netlify.toml`
-- No `replit.nix`
-- No `.replit`
-- No systemd service file
-- No Nginx/Apache config
-
-## Conclusion
-This repository is currently an empty Git repository placeholder, not yet a runnable COLORJET ERP / Odoo sync application. The next step is to add or restore the actual existing source code before implementation, repair, build, test, deployment, route audit, database migration, or Odoo sync validation can be completed.
+The Expo app is the primary Android build target. The existing WebView wrapper remains untouched to avoid destructive migration. No database records, credentials, logo assets or production configuration values were changed.
