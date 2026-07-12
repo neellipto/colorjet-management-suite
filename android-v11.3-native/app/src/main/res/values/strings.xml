@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">COLORJET ERP</string>
-    <string name="field_service_url">https://erp.ept.com.bd/field-service/mobile</string>
+    <string name="erp_base_url">https://erp.ept.com.bd</string>
+    <string name="dashboard_url">https://erp.ept.com.bd/dashboard</string>
+    <string name="attendance_url">https://erp.ept.com.bd/hr/attendance</string>
+    <string name="notifications_url">https://erp.ept.com.bd/notifications</string>
+    <string name="messages_url">https://erp.ept.com.bd/messages</string>
     <string name="api_base_url">https://erp.ept.com.bd/api/v1</string>
     <string name="notification_channel_name">COLORJET Duty Tracking</string>
     <string name="notification_title">COLORJET route tracking active</string>

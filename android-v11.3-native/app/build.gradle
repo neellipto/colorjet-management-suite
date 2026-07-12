@@ -16,8 +16,8 @@ android {
         applicationId 'com.colorjetbd.erp'
         minSdk 24
         targetSdk 35
-        versionCode 8
-        versionName '1.6.0'
+        versionCode 9
+        versionName '1.7.0'
     }
 
     signingConfigs {
@@ -40,9 +40,7 @@ android {
             minifyEnabled false
             shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            if (releaseSigningReady) {
-                signingConfig signingConfigs.release
-            }
+            if (releaseSigningReady) signingConfig signingConfigs.release
         }
     }
 
@@ -52,5 +50,4 @@ android {
     }
 }
 
-dependencies {
-}
+dependencies { }
