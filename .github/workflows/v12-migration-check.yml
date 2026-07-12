@@ -121,17 +121,35 @@ jobs:
           set -o pipefail
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712121500_v13_parts_dispatch_reservation_fix.sql 2>&1 | tee 22-v13-reservation-fix.log
 
-      - name: Apply V13 tasks, import, HR and biometric migration
+      - name: Apply V13 office task migration
         shell: bash
         run: |
           set -o pipefail
-          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712122000_v13_tasks_import_hr_biometric.sql 2>&1 | tee 30-v13-business-operations.log
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712122000_v13_office_tasks.sql 2>&1 | tee 30-v13-office-tasks.log
+
+      - name: Apply V13 import logistics migration
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712122100_v13_import_logistics.sql 2>&1 | tee 31-v13-import-logistics.log
+
+      - name: Apply V13 HR payroll migration
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712122200_v13_hr_payroll.sql 2>&1 | tee 32-v13-hr-payroll.log
+
+      - name: Apply V13 biometric connector migration
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712122300_v13_biometric_connectors.sql 2>&1 | tee 33-v13-biometric.log
 
       - name: Apply V13 notification outbox migration
         shell: bash
         run: |
           set -o pipefail
-          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712122500_v13_alert_notification_outbox.sql 2>&1 | tee 31-v13-notification-outbox.log
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712122500_v13_alert_notification_outbox.sql 2>&1 | tee 34-v13-notification-outbox.log
 
       - name: Verify required V12 and V13 objects
         shell: bash
@@ -140,42 +158,22 @@ jobs:
           psql -v ON_ERROR_STOP=1 2>&1 <<'SQL' | tee 90-verification.log
           do $$
           begin
-            if to_regclass('public.v12_customer_visits') is null then
-              raise exception 'v12_customer_visits missing';
-            end if;
-            if to_regprocedure('public.v12_create_parts_request(uuid,uuid,text,text,text,timestamp with time zone,jsonb)') is null then
-              raise exception 'v12_create_parts_request missing';
-            end if;
-            if to_regclass('public.v13_service_cases') is null then
-              raise exception 'v13_service_cases missing';
-            end if;
-            if to_regclass('public.v13_warranty_registrations') is null then
-              raise exception 'v13_warranty_registrations missing';
-            end if;
-            if to_regprocedure('public.v13_refresh_sla_alerts()') is null then
-              raise exception 'v13_refresh_sla_alerts missing';
-            end if;
-            if to_regclass('public.v13_parts_reservations') is null then
-              raise exception 'v13_parts_reservations missing';
-            end if;
-            if to_regprocedure('public.v13_create_parts_dispatch(uuid,uuid,text,uuid,text,text,text,numeric,timestamp with time zone,jsonb)') is null then
-              raise exception 'v13_create_parts_dispatch missing';
-            end if;
-            if to_regclass('public.v13_office_tasks') is null then
-              raise exception 'v13_office_tasks missing';
-            end if;
-            if to_regclass('public.v13_import_orders') is null then
-              raise exception 'v13_import_orders missing';
-            end if;
-            if to_regclass('public.v13_leave_requests') is null then
-              raise exception 'v13_leave_requests missing';
-            end if;
-            if to_regclass('public.v13_biometric_connectors') is null then
-              raise exception 'v13_biometric_connectors missing';
-            end if;
-            if to_regclass('public.v13_notification_outbox') is null then
-              raise exception 'v13_notification_outbox missing';
-            end if;
+            if to_regclass('public.v12_customer_visits') is null then raise exception 'v12_customer_visits missing'; end if;
+            if to_regprocedure('public.v12_create_parts_request(uuid,uuid,text,text,text,timestamp with time zone,jsonb)') is null then raise exception 'v12_create_parts_request missing'; end if;
+            if to_regclass('public.v13_service_cases') is null then raise exception 'v13_service_cases missing'; end if;
+            if to_regclass('public.v13_warranty_registrations') is null then raise exception 'v13_warranty_registrations missing'; end if;
+            if to_regprocedure('public.v13_refresh_sla_alerts()') is null then raise exception 'v13_refresh_sla_alerts missing'; end if;
+            if to_regclass('public.v13_parts_reservations') is null then raise exception 'v13_parts_reservations missing'; end if;
+            if to_regprocedure('public.v13_create_parts_dispatch(uuid,uuid,text,uuid,text,text,text,numeric,timestamp with time zone,jsonb)') is null then raise exception 'v13_create_parts_dispatch missing'; end if;
+            if to_regclass('public.v13_office_tasks') is null then raise exception 'v13_office_tasks missing'; end if;
+            if to_regclass('public.v13_import_orders') is null then raise exception 'v13_import_orders missing'; end if;
+            if to_regclass('public.v13_shipments') is null then raise exception 'v13_shipments missing'; end if;
+            if to_regclass('public.v13_trucking_jobs') is null then raise exception 'v13_trucking_jobs missing'; end if;
+            if to_regclass('public.v13_leave_requests') is null then raise exception 'v13_leave_requests missing'; end if;
+            if to_regclass('public.v13_payroll_entries') is null then raise exception 'v13_payroll_entries missing'; end if;
+            if to_regclass('public.v13_biometric_connectors') is null then raise exception 'v13_biometric_connectors missing'; end if;
+            if to_regprocedure('public.v13_ingest_biometric_event(text,text,text,timestamp with time zone,text,text,text,text,jsonb,text)') is null then raise exception 'v13_ingest_biometric_event missing'; end if;
+            if to_regclass('public.v13_notification_outbox') is null then raise exception 'v13_notification_outbox missing'; end if;
           end;
           $$;
           SQL
