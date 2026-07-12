@@ -252,6 +252,7 @@ export interface Shipment {
   container_no?: string | null;
   origin?: string | null;
   destination?: string | null;
+  port_of_discharge?: string | null;
   etd?: string | null;
   eta?: string | null;
   status: string;
