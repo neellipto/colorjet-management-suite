@@ -1,0 +1,43 @@
+name: Android Single Navigation APK
+
+on:
+  pull_request:
+    paths:
+      - "android-v11.3-native/**"
+      - ".github/workflows/android-single-navigation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-single-navigation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android-v11.3-native
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+      - name: Build debug APK
+        run: ./gradlew clean assembleDebug --stacktrace
+      - name: Create checksum
+        run: sha256sum app/build/outputs/apk/debug/app-debug.apk > app/build/outputs/apk/debug/checksums.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: COLORJET-ERP-single-navigation-APK
+          path: |
+            android-v11.3-native/app/build/outputs/apk/debug/app-debug.apk
+            android-v11.3-native/app/build/outputs/apk/debug/checksums.sha256
+          if-no-files-found: error
+          retention-days: 14
