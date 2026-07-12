@@ -26,7 +26,7 @@ function MenuItem({ icon, label, subtitle, onPress, iconBg, iconColor, badge }: 
       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
       activeOpacity={0.75}
     >
-      <View style={[styles.menuIcon, { backgroundColor: iconBg ?? colors.navyLight }]}>
+      <View style={[styles.menuIcon, { backgroundColor: iconBg ?? colors.navyLight }]}> 
         <Feather name={icon} size={20} color={iconColor ?? colors.primary} />
       </View>
       <View style={styles.menuText}>
@@ -75,21 +75,17 @@ export default function MoreScreen() {
       contentContainerStyle={{ paddingTop: pt + 16, paddingBottom: pb, paddingHorizontal: 16, gap: 8 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* User Card */}
-      <View style={[styles.userCard, { backgroundColor: colors.primary }]}>
-        <View style={[styles.userAvatar, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+      <View style={[styles.userCard, { backgroundColor: colors.primary }]}> 
+        <View style={[styles.userAvatar, { backgroundColor: 'rgba(255,255,255,0.2)' }]}> 
           <Feather name="user" size={24} color="#fff" />
         </View>
         <View style={styles.userInfo}>
           <Text style={styles.userName}>{currentUser?.name}</Text>
           <Text style={styles.userRole}>{role.charAt(0).toUpperCase() + role.slice(1)} · COLORJET Bangladesh</Text>
-          {currentUser?.employeeCode ? (
-            <Text style={styles.userCode}>{currentUser.employeeCode}</Text>
-          ) : null}
+          {currentUser?.employeeCode ? <Text style={styles.userCode}>{currentUser.employeeCode}</Text> : null}
         </View>
       </View>
 
-      {/* Admin Control Center */}
       {isAdmin && (
         <>
           <SectionLabel label="ADMIN CONTROL CENTER" />
@@ -103,16 +99,15 @@ export default function MoreScreen() {
         </>
       )}
 
-      {/* Service Operations */}
       {(isAdmin || isServiceControl) && (
         <>
           <SectionLabel label="SERVICE OPERATIONS" />
-          <MenuItem icon="activity" label="Service Control" subtitle="Live ticket dashboard" onPress={() => router.push('/service-control' as any)} iconBg={colors.navyLight} iconColor={colors.primary} />
+          <MenuItem icon="activity" label="Field Operations V12" subtitle="Live travel, GPS check-in, SLA and route audit" onPress={() => router.push('/field-operations' as any)} iconBg="#E3F2FD" iconColor="#1565C0" />
+          <MenuItem icon="monitor" label="Service Control" subtitle="Live ticket dashboard" onPress={() => router.push('/service-control' as any)} iconBg={colors.navyLight} iconColor={colors.primary} />
           <MenuItem icon="calendar" label="Engineer Schedule" subtitle="Plan and track visits" onPress={() => router.push('/schedule' as any)} iconBg="#E8F5E9" iconColor="#2E7D32" />
         </>
       )}
 
-      {/* Management Section */}
       {(isAdmin || isAccounts) && (
         <>
           <SectionLabel label="MANAGEMENT" />
@@ -122,7 +117,6 @@ export default function MoreScreen() {
         </>
       )}
 
-      {/* Accounts Section */}
       {(isAdmin || isAccounts) && (
         <>
           <SectionLabel label="FINANCE" />
@@ -130,15 +124,21 @@ export default function MoreScreen() {
         </>
       )}
 
-      {/* Service Section */}
-      {(isAdmin || isEngineer) && (
+      {isEngineer && (
         <>
-          <SectionLabel label="OPERATIONS" />
-          {isAdmin && <MenuItem icon="truck" label="Deliveries" subtitle="Delivery order tracking" onPress={() => router.push('/delivery' as any)} iconBg={colors.orangeLight} iconColor={colors.secondary} />}
+          <SectionLabel label="ENGINEER OPERATIONS" />
+          <MenuItem icon="navigation" label="My Field Visits" subtitle="Travel, check-in, work and customer confirmation" onPress={() => router.push('/field-operations' as any)} iconBg="#E3F2FD" iconColor="#1565C0" />
+          <MenuItem icon="calendar" label="My Schedule" subtitle="Assigned customer visits" onPress={() => router.push('/schedule' as any)} iconBg="#E8F5E9" iconColor="#2E7D32" />
         </>
       )}
 
-      {/* Marketing Section */}
+      {isAdmin && (
+        <>
+          <SectionLabel label="OPERATIONS" />
+          <MenuItem icon="truck" label="Deliveries" subtitle="Delivery order tracking" onPress={() => router.push('/delivery' as any)} iconBg={colors.orangeLight} iconColor={colors.secondary} />
+        </>
+      )}
+
       {isMarketing && (
         <>
           <SectionLabel label="MY TOOLS" />
@@ -147,7 +147,6 @@ export default function MoreScreen() {
         </>
       )}
 
-      {/* Store Section */}
       {isStore && (
         <>
           <SectionLabel label="STORE TOOLS" />
@@ -163,7 +162,6 @@ export default function MoreScreen() {
         </>
       )}
 
-      {/* Notifications */}
       <SectionLabel label="NOTIFICATIONS" />
       <MenuItem
         icon="bell"
@@ -175,11 +173,9 @@ export default function MoreScreen() {
         iconColor="#F57F17"
       />
 
-      {/* Account */}
       <SectionLabel label="ACCOUNT" />
       <MenuItem icon="user" label="My Profile" subtitle="View and edit profile" onPress={() => router.push('/profile' as any)} />
 
-      {/* Sign Out */}
       <TouchableOpacity
         style={[styles.logoutBtn, { backgroundColor: '#FFEBEE', borderColor: '#FFCDD2' }]}
         onPress={handleLogout}
@@ -189,7 +185,7 @@ export default function MoreScreen() {
         <Text style={[styles.logoutText, { color: '#C62828' }]}>Sign Out</Text>
       </TouchableOpacity>
 
-      <Text style={[styles.version, { color: colors.mutedForeground }]}>COLORJET ERP v2.0 · Bangladesh</Text>
+      <Text style={[styles.version, { color: colors.mutedForeground }]}>COLORJET ERP V12 Engineer Operations · Bangladesh</Text>
     </ScrollView>
   );
 }
