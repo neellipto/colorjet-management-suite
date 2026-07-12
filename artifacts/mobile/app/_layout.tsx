@@ -56,6 +56,13 @@ function RootLayoutNav() {
       <Stack.Screen name="service-control" options={{ title: "Service Control", headerBackTitle: "Back" }} />
       <Stack.Screen name="field-operations" options={{ title: "Field Operations", headerBackTitle: "Back" }} />
       <Stack.Screen name="route-history" options={{ title: "Route History", headerBackTitle: "Back" }} />
+      <Stack.Screen name="service-warranty" options={{ title: "Service & Warranty", headerBackTitle: "Back" }} />
+      <Stack.Screen name="parts-logistics" options={{ title: "Parts Logistics", headerBackTitle: "Back" }} />
+      <Stack.Screen name="sla-dashboard" options={{ title: "SLA Dashboard", headerBackTitle: "Back" }} />
+      <Stack.Screen name="office-tasks" options={{ title: "Office Tasks", headerBackTitle: "Back" }} />
+      <Stack.Screen name="import-logistics" options={{ title: "Import Logistics", headerBackTitle: "Back" }} />
+      <Stack.Screen name="hr-operations" options={{ title: "HR Operations", headerBackTitle: "Back" }} />
+      <Stack.Screen name="biometric-connectors" options={{ title: "Biometric Connectors", headerBackTitle: "Back" }} />
       <Stack.Screen name="admin/company" options={{ title: "Company Profile", headerBackTitle: "Back" }} />
       <Stack.Screen name="admin/branding" options={{ title: "Branding", headerBackTitle: "Back" }} />
       <Stack.Screen name="admin/catalog" options={{ title: "Catalog & Categories", headerBackTitle: "Back" }} />
