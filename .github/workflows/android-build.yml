@@ -39,6 +39,10 @@ jobs:
       - name: Install dependencies
         working-directory: .
         run: pnpm install --no-frozen-lockfile
+      - name: Align Expo SDK dependencies
+        env:
+          CI: "1"
+        run: pnpm exec expo install --fix
       - name: Verify React Native Gradle plugin
         run: node --print "require.resolve('@react-native/gradle-plugin/package.json')"
       - name: Type-check
@@ -109,6 +113,10 @@ jobs:
       - name: Install dependencies
         working-directory: .
         run: pnpm install --no-frozen-lockfile
+      - name: Align Expo SDK dependencies
+        env:
+          CI: "1"
+        run: pnpm exec expo install --fix
       - name: Generate Android project
         env:
           CI: "1"
