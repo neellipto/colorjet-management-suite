@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: v13-android-${{ github.ref }}
+  group: v13-android-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:
