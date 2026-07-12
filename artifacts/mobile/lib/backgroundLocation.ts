@@ -178,14 +178,6 @@ export async function requestFieldLocationPermissions(): Promise<{
     return { foreground: false, background: false };
   }
 
-  if (Platform.OS !== 'android') {
-    const background = await Location.requestBackgroundPermissionsAsync();
-    return {
-      foreground: true,
-      background: background.status === Location.PermissionStatus.GRANTED,
-    };
-  }
-
   const background = await Location.requestBackgroundPermissionsAsync();
   return {
     foreground: true,
@@ -194,7 +186,10 @@ export async function requestFieldLocationPermissions(): Promise<{
 }
 
 export async function getCurrentFieldPosition(): Promise<Location.LocationObject> {
-  const permission = await Location.getForegroundPermissionsAsync();
+  let permission = await Location.getForegroundPermissionsAsync();
+  if (permission.status !== Location.PermissionStatus.GRANTED) {
+    permission = await Location.requestForegroundPermissionsAsync();
+  }
   if (permission.status !== Location.PermissionStatus.GRANTED) {
     throw new Error('Precise location permission is required.');
   }
