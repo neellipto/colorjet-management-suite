@@ -1,5 +1,5 @@
 -- COLORJET ERP V12 Engineer Operations
--- Production-safe, idempotent Supabase/PostgreSQL migration.
+-- Production-safe Supabase/PostgreSQL migration.
 -- Odoo integration is intentionally untouched.
 
 create extension if not exists pgcrypto;
@@ -276,26 +276,32 @@ create table if not exists public.v12_offline_mutations (
   applied_at timestamptz
 );
 
+drop trigger if exists v12_customer_visits_updated_at on public.v12_customer_visits;
 create trigger v12_customer_visits_updated_at
 before update on public.v12_customer_visits
 for each row execute function public.v12_set_updated_at();
 
+drop trigger if exists v12_tracking_sessions_updated_at on public.v12_tracking_sessions;
 create trigger v12_tracking_sessions_updated_at
 before update on public.v12_tracking_sessions
 for each row execute function public.v12_set_updated_at();
 
+drop trigger if exists v12_parts_requests_updated_at on public.v12_parts_requests;
 create trigger v12_parts_requests_updated_at
 before update on public.v12_parts_requests
 for each row execute function public.v12_set_updated_at();
 
+drop trigger if exists v12_parts_dispatches_updated_at on public.v12_parts_dispatches;
 create trigger v12_parts_dispatches_updated_at
 before update on public.v12_parts_dispatches
 for each row execute function public.v12_set_updated_at();
 
+drop trigger if exists v12_sla_rules_updated_at on public.v12_sla_rules;
 create trigger v12_sla_rules_updated_at
 before update on public.v12_sla_rules
 for each row execute function public.v12_set_updated_at();
 
+drop trigger if exists v12_sla_events_updated_at on public.v12_sla_events;
 create trigger v12_sla_events_updated_at
 before update on public.v12_sla_events
 for each row execute function public.v12_set_updated_at();
@@ -409,7 +415,7 @@ begin
 
   update public.v12_tracking_sessions
   set status = 'completed', ended_at = timezone('utc', now())
-  where engineer_id = auth.uid() and status = 'active';
+  where engineer_id = v_visit.assigned_engineer_id and status = 'active';
 
   insert into public.v12_tracking_sessions (
     visit_id, engineer_id, device_id, start_latitude, start_longitude
@@ -466,12 +472,19 @@ begin
     p_network_type, coalesce(p_is_mock, false), p_captured_at, p_idempotency_key,
     coalesce(p_metadata, '{}'::jsonb)
   )
-  on conflict (idempotency_key) do update set idempotency_key = excluded.idempotency_key
+  on conflict (idempotency_key) do nothing
   returning id into v_point_id;
+
+  if v_point_id is null then
+    select id into v_point_id
+    from public.v12_location_points
+    where idempotency_key = p_idempotency_key;
+    return v_point_id;
+  end if;
 
   update public.v12_tracking_sessions
   set point_count = point_count + 1,
-      last_point_at = p_captured_at,
+      last_point_at = greatest(coalesce(last_point_at, p_captured_at), p_captured_at),
       end_latitude = p_latitude,
       end_longitude = p_longitude
   where id = p_session_id;
@@ -522,6 +535,7 @@ alter table public.v12_sla_rules enable row level security;
 alter table public.v12_sla_events enable row level security;
 alter table public.v12_offline_mutations enable row level security;
 
+drop policy if exists v12_visits_select on public.v12_customer_visits;
 create policy v12_visits_select on public.v12_customer_visits
 for select to authenticated
 using (
@@ -530,10 +544,12 @@ using (
   or public.v12_has_role(array['owner','super_admin','admin','manager','service_manager','store','accounts','auditor'])
 );
 
+drop policy if exists v12_visits_insert on public.v12_customer_visits;
 create policy v12_visits_insert on public.v12_customer_visits
 for insert to authenticated
 with check (public.v12_has_role(array['owner','super_admin','admin','manager','service_manager']));
 
+drop policy if exists v12_visits_update on public.v12_customer_visits;
 create policy v12_visits_update on public.v12_customer_visits
 for update to authenticated
 using (
@@ -545,6 +561,7 @@ with check (
   or public.v12_has_role(array['owner','super_admin','admin','manager','service_manager'])
 );
 
+drop policy if exists v12_visit_events_select on public.v12_visit_events;
 create policy v12_visit_events_select on public.v12_visit_events
 for select to authenticated
 using (
@@ -555,14 +572,17 @@ using (
   )
 );
 
+drop policy if exists v12_tracking_sessions_select on public.v12_tracking_sessions;
 create policy v12_tracking_sessions_select on public.v12_tracking_sessions
 for select to authenticated
 using (engineer_id = auth.uid() or public.v12_has_role(array['owner','super_admin','admin','manager','service_manager','auditor']));
 
+drop policy if exists v12_location_points_select on public.v12_location_points;
 create policy v12_location_points_select on public.v12_location_points
 for select to authenticated
 using (engineer_id = auth.uid() or public.v12_has_role(array['owner','super_admin','admin','manager','service_manager','auditor']));
 
+drop policy if exists v12_parts_requests_select on public.v12_parts_requests;
 create policy v12_parts_requests_select on public.v12_parts_requests
 for select to authenticated
 using (
@@ -571,18 +591,26 @@ using (
   or public.v12_has_role(array['owner','super_admin','admin','manager','service_manager','store','accounts','auditor'])
 );
 
+drop policy if exists v12_parts_requests_insert on public.v12_parts_requests;
 create policy v12_parts_requests_insert on public.v12_parts_requests
 for insert to authenticated
 with check (requested_by = auth.uid());
 
+drop policy if exists v12_parts_requests_update on public.v12_parts_requests;
 create policy v12_parts_requests_update on public.v12_parts_requests
 for update to authenticated
 using (
   requested_by = auth.uid()
   or assigned_store_user_id = auth.uid()
   or public.v12_has_role(array['owner','super_admin','admin','manager','service_manager','store'])
+)
+with check (
+  requested_by = auth.uid()
+  or assigned_store_user_id = auth.uid()
+  or public.v12_has_role(array['owner','super_admin','admin','manager','service_manager','store'])
 );
 
+drop policy if exists v12_parts_request_items_select on public.v12_parts_request_items;
 create policy v12_parts_request_items_select on public.v12_parts_request_items
 for select to authenticated
 using (exists (
@@ -591,6 +619,7 @@ using (exists (
     and (r.requested_by = auth.uid() or r.assigned_store_user_id = auth.uid() or public.v12_has_role(array['owner','super_admin','admin','manager','service_manager','store','auditor']))
 ));
 
+drop policy if exists v12_parts_request_items_insert on public.v12_parts_request_items;
 create policy v12_parts_request_items_insert on public.v12_parts_request_items
 for insert to authenticated
 with check (exists (
@@ -598,15 +627,18 @@ with check (exists (
   where r.id = request_id and (r.requested_by = auth.uid() or public.v12_has_role(array['owner','super_admin','admin','manager','service_manager']))
 ));
 
+drop policy if exists v12_parts_dispatches_select on public.v12_parts_dispatches;
 create policy v12_parts_dispatches_select on public.v12_parts_dispatches
 for select to authenticated
 using (receiver_user_id = auth.uid() or public.v12_has_role(array['owner','super_admin','admin','manager','service_manager','store','accounts','auditor']));
 
+drop policy if exists v12_parts_dispatches_write on public.v12_parts_dispatches;
 create policy v12_parts_dispatches_write on public.v12_parts_dispatches
 for all to authenticated
 using (public.v12_has_role(array['owner','super_admin','admin','manager','service_manager','store']))
 with check (public.v12_has_role(array['owner','super_admin','admin','manager','service_manager','store']));
 
+drop policy if exists v12_parts_dispatch_items_select on public.v12_parts_dispatch_items;
 create policy v12_parts_dispatch_items_select on public.v12_parts_dispatch_items
 for select to authenticated
 using (exists (
@@ -614,19 +646,23 @@ using (exists (
   where d.id = dispatch_id and (d.receiver_user_id = auth.uid() or public.v12_has_role(array['owner','super_admin','admin','manager','service_manager','store','accounts','auditor']))
 ));
 
+drop policy if exists v12_parts_dispatch_items_write on public.v12_parts_dispatch_items;
 create policy v12_parts_dispatch_items_write on public.v12_parts_dispatch_items
 for all to authenticated
 using (public.v12_has_role(array['owner','super_admin','admin','manager','service_manager','store']))
 with check (public.v12_has_role(array['owner','super_admin','admin','manager','service_manager','store']));
 
+drop policy if exists v12_sla_rules_read on public.v12_sla_rules;
 create policy v12_sla_rules_read on public.v12_sla_rules
 for select to authenticated using (true);
 
+drop policy if exists v12_sla_rules_write on public.v12_sla_rules;
 create policy v12_sla_rules_write on public.v12_sla_rules
 for all to authenticated
 using (public.v12_has_role(array['owner','super_admin','admin','manager','service_manager']))
 with check (public.v12_has_role(array['owner','super_admin','admin','manager','service_manager']));
 
+drop policy if exists v12_sla_events_read on public.v12_sla_events;
 create policy v12_sla_events_read on public.v12_sla_events
 for select to authenticated
 using (exists (
@@ -634,11 +670,13 @@ using (exists (
   where v.id = visit_id and (v.assigned_engineer_id = auth.uid() or public.v12_has_role(array['owner','super_admin','admin','manager','service_manager','auditor']))
 ));
 
+drop policy if exists v12_sla_events_write on public.v12_sla_events;
 create policy v12_sla_events_write on public.v12_sla_events
 for all to authenticated
 using (public.v12_has_role(array['owner','super_admin','admin','manager','service_manager']))
 with check (public.v12_has_role(array['owner','super_admin','admin','manager','service_manager']));
 
+drop policy if exists v12_offline_mutations_owner on public.v12_offline_mutations;
 create policy v12_offline_mutations_owner on public.v12_offline_mutations
 for all to authenticated
 using (user_id = auth.uid() or public.v12_has_role(array['owner','super_admin','admin','auditor']))
@@ -662,4 +700,5 @@ grant execute on function public.v12_stop_tracking_session(uuid,double precision
 
 comment on table public.v12_customer_visits is 'COLORJET V12 customer visit workflow and engineer assignment source of truth.';
 comment on table public.v12_location_points is 'Background route points captured only during explicit active field tracking sessions.';
-comment on function public.v12_transition_visit is 'Validates visit status transitions, authorization, audit trail and idempotency.';
+comment on function public.v12_transition_visit(uuid,text,text,double precision,double precision,double precision,text,text)
+  is 'Validates visit status transitions, authorization, audit trail and idempotency.';
