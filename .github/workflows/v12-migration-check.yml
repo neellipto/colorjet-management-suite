@@ -42,7 +42,8 @@ jobs:
       - name: Bootstrap Supabase-compatible auth and inventory objects
         shell: bash
         run: |
-          psql -v ON_ERROR_STOP=1 <<'SQL'
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 2>&1 <<'SQL' | tee 00-bootstrap.log
           create role authenticated nologin;
           create role service_role nologin;
           create schema auth;
@@ -91,27 +92,52 @@ jobs:
           SQL
 
       - name: Apply V12 engineer operations migration
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712101800_v12_engineer_operations.sql
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712101800_v12_engineer_operations.sql 2>&1 | tee 10-v12-engineer.log
 
       - name: Apply V12 transactional parts migration
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712111000_v12_parts_request_rpc.sql
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712111000_v12_parts_request_rpc.sql 2>&1 | tee 11-v12-parts.log
 
       - name: Apply V13 service, warranty and SLA migration
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712120000_v13_service_warranty_sla.sql
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712120000_v13_service_warranty_sla.sql 2>&1 | tee 20-v13-service.log
 
       - name: Apply V13 parts and stock migration
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712121000_v13_parts_stock_workflow.sql
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712121000_v13_parts_stock_workflow.sql 2>&1 | tee 21-v13-parts.log
 
       - name: Apply V13 reservation correction
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712121500_v13_parts_dispatch_reservation_fix.sql
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712121500_v13_parts_dispatch_reservation_fix.sql 2>&1 | tee 22-v13-reservation-fix.log
 
       - name: Apply V13 tasks, import, HR and biometric migration
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712122000_v13_tasks_import_hr_biometric.sql
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712122000_v13_tasks_import_hr_biometric.sql 2>&1 | tee 30-v13-business-operations.log
+
+      - name: Apply V13 notification outbox migration
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712122500_v13_alert_notification_outbox.sql 2>&1 | tee 31-v13-notification-outbox.log
 
       - name: Verify required V12 and V13 objects
         shell: bash
         run: |
-          psql -v ON_ERROR_STOP=1 <<'SQL'
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 2>&1 <<'SQL' | tee 90-verification.log
           do $$
           begin
             if to_regclass('public.v12_customer_visits') is null then
@@ -147,6 +173,17 @@ jobs:
             if to_regclass('public.v13_biometric_connectors') is null then
               raise exception 'v13_biometric_connectors missing';
             end if;
+            if to_regclass('public.v13_notification_outbox') is null then
+              raise exception 'v13_notification_outbox missing';
+            end if;
           end;
           $$;
           SQL
+
+      - name: Upload migration diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v13-postgres-migration-logs
+          path: '*.log'
+          if-no-files-found: warn
