@@ -3,6 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/colorSurface"
+    android:fitsSystemWindows="true"
     android:orientation="vertical">
 
     <ProgressBar
@@ -19,19 +20,22 @@
         android:layout_weight="1" />
 
     <LinearLayout
+        android:id="@+id/native_bottom_navigation"
         android:layout_width="match_parent"
-        android:layout_height="58dp"
-        android:background="#FFFFFF"
-        android:elevation="10dp"
+        android:layout_height="76dp"
+        android:background="@drawable/nav_bar_background"
+        android:elevation="16dp"
         android:gravity="center"
         android:orientation="horizontal"
-        android:paddingStart="4dp"
-        android:paddingEnd="4dp">
+        android:paddingStart="7dp"
+        android:paddingTop="7dp"
+        android:paddingEnd="7dp"
+        android:paddingBottom="8dp">
 
-        <Button android:id="@+id/nav_home" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="?android:attr/selectableItemBackground" android:text="Home" android:textAllCaps="false" android:textSize="11sp" />
-        <Button android:id="@+id/nav_attendance" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="?android:attr/selectableItemBackground" android:text="Attendance" android:textAllCaps="false" android:textSize="10sp" />
-        <Button android:id="@+id/nav_notifications" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="?android:attr/selectableItemBackground" android:text="Alerts" android:textAllCaps="false" android:textSize="11sp" />
-        <Button android:id="@+id/nav_messages" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="?android:attr/selectableItemBackground" android:text="Messages" android:textAllCaps="false" android:textSize="10sp" />
-        <Button android:id="@+id/nav_more" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="?android:attr/selectableItemBackground" android:text="More" android:textAllCaps="false" android:textSize="11sp" />
+        <TextView android:id="@+id/nav_home" style="@style/PremiumNavButton" android:text="⌂&#10;Home" />
+        <TextView android:id="@+id/nav_attendance" style="@style/PremiumNavButton" android:text="✓&#10;Attendance" />
+        <TextView android:id="@+id/nav_notifications" style="@style/PremiumNavButton" android:text="●&#10;Alerts" />
+        <TextView android:id="@+id/nav_messages" style="@style/PremiumNavButton" android:text="✉&#10;Messages" />
+        <TextView android:id="@+id/nav_more" style="@style/PremiumNavButton" android:text="▦&#10;More" />
     </LinearLayout>
 </LinearLayout>
