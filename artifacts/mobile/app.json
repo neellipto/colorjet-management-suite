@@ -1,11 +1,11 @@
 {
   "expo": {
     "name": "COLORJET ERP",
-    "slug": "mobile",
-    "version": "1.0.0",
+    "slug": "colorjet-management-suite",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "colorjet-erp",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/images/splash.png",
@@ -13,9 +13,26 @@
       "backgroundColor": "#1A237E"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.colorjetbd.managementsuite",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "COLORJET uses your location to verify attendance and customer-site visits.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "During an active assigned field visit, COLORJET records the route with a visible tracking indicator."
+      }
     },
-    "android": {},
+    "android": {
+      "package": "com.colorjetbd.managementsuite",
+      "versionCode": 1200,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "POST_NOTIFICATIONS",
+        "CAMERA"
+      ]
+    },
     "web": {
       "favicon": "./assets/images/favicon.png",
       "bundler": "metro"
@@ -27,7 +44,15 @@
           "origin": "https://replit.com/"
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "During an active assigned field visit, COLORJET records your route with a visible notification.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isIosBackgroundLocationEnabled": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
