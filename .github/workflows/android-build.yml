@@ -39,18 +39,18 @@ jobs:
       - name: Install dependencies
         working-directory: .
         run: pnpm install --no-frozen-lockfile
+      - name: Verify React Native Gradle plugin
+        run: node --print "require.resolve('@react-native/gradle-plugin/package.json')"
       - name: Type-check
         run: pnpm run typecheck
       - name: Export web/PWA
         run: pnpm run build
-        env:
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-          EXPO_PUBLIC_PASSWORD_RESET_REDIRECT: ${{ secrets.EXPO_PUBLIC_PASSWORD_RESET_REDIRECT }}
       - name: Generate native Android project
-        run: pnpm exec expo prebuild --platform android --non-interactive --clean
+        env:
+          CI: "1"
+        run: pnpm exec expo prebuild --platform android --clean
       - name: Build debug APK
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug --stacktrace
         working-directory: artifacts/mobile/android
       - name: Generate checksum
         run: sha256sum android/app/build/outputs/apk/debug/app-debug.apk > checksums.sha256
@@ -70,11 +70,30 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write
+    env:
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      EXPO_PUBLIC_AUTH_REDIRECT_URL: ${{ secrets.EXPO_PUBLIC_AUTH_REDIRECT_URL }}
+      EXPO_PUBLIC_PASSWORD_RESET_REDIRECT: ${{ secrets.EXPO_PUBLIC_PASSWORD_RESET_REDIRECT }}
     defaults:
       run:
         working-directory: artifacts/mobile
     steps:
       - uses: actions/checkout@v4
+      - name: Verify release secrets
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE"
+          test -n "$ALIAS"
+          test -n "$KEY_PASSWORD"
+          test -n "$STORE_PASSWORD"
+          test -n "$EXPO_PUBLIC_SUPABASE_URL"
+          test -n "$EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+          test -n "$EXPO_PUBLIC_AUTH_REDIRECT_URL"
       - uses: pnpm/action-setup@v4
         with:
           version: 9
@@ -91,17 +110,19 @@ jobs:
         working-directory: .
         run: pnpm install --no-frozen-lockfile
       - name: Generate Android project
-        run: pnpm exec expo prebuild --platform android --non-interactive --clean
+        env:
+          CI: "1"
+        run: pnpm exec expo prebuild --platform android --clean
       - name: Restore upload keystore
         run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
       - name: Build signed AAB
         working-directory: artifacts/mobile/android
-        env:
-          COLORJET_STORE_FILE: upload-keystore.jks
-          COLORJET_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          COLORJET_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          COLORJET_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
-        run: ./gradlew bundleRelease
+        run: >
+          ./gradlew bundleRelease
+          -Pandroid.injected.signing.store.file=${{ github.workspace }}/artifacts/mobile/android/app/upload-keystore.jks
+          -Pandroid.injected.signing.store.password=${{ secrets.ANDROID_STORE_PASSWORD }}
+          -Pandroid.injected.signing.key.alias=${{ secrets.ANDROID_KEY_ALIAS }}
+          -Pandroid.injected.signing.key.password=${{ secrets.ANDROID_KEY_PASSWORD }}
       - name: Checksums
         run: sha256sum android/app/build/outputs/bundle/release/app-release.aab > checksums-release.sha256
       - uses: actions/upload-artifact@v4
