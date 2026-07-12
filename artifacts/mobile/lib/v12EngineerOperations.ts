@@ -289,27 +289,14 @@ export async function createPartsRequest(input: {
 }): Promise<string> {
   if (!input.items.length) throw new Error('At least one spare part is required.');
 
-  const supabase = getSupabase();
-  const requestNo = `CJ-PR-${Date.now()}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
-  const { data: request, error: requestError } = await supabase
-    .from('v12_parts_requests')
-    .insert({
-      request_no: requestNo,
-      ticket_id: input.ticketId ?? null,
-      visit_id: input.visitId ?? null,
-      urgency: input.urgency,
-      request_type: input.requestType,
-      reason: input.reason.trim(),
-      required_at: input.requiredAt ?? null,
-    })
-    .select('id')
-    .single();
-
-  if (requestError || !request) throw new Error(requestError?.message ?? 'Parts request could not be created.');
-
-  const { error: itemError } = await supabase.from('v12_parts_request_items').insert(
-    input.items.map(item => ({
-      request_id: request.id,
+  const { data, error } = await getSupabase().rpc('v12_create_parts_request', {
+    p_ticket_id: input.ticketId ?? null,
+    p_visit_id: input.visitId ?? null,
+    p_urgency: input.urgency,
+    p_request_type: input.requestType,
+    p_reason: input.reason.trim(),
+    p_required_at: input.requiredAt ?? null,
+    p_items: input.items.map(item => ({
       product_id: item.productId ?? null,
       sku: item.sku ?? null,
       product_name: item.productName.trim(),
@@ -320,12 +307,7 @@ export async function createPartsRequest(input: {
       damaged_part_serial: item.damagedPartSerial?.trim() || null,
       note: item.note?.trim() || null,
     })),
-  );
+  });
 
-  if (itemError) {
-    await supabase.from('v12_parts_requests').delete().eq('id', request.id);
-    throw new Error(itemError.message);
-  }
-
-  return request.id as string;
+  return unwrap(data as string | null, error, 'Parts request could not be created.');
 }
