@@ -21,7 +21,6 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
@@ -74,7 +73,7 @@ public final class MainActivity extends Activity {
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(true);
         settings.setMediaPlaybackRequiresUserGesture(true);
-        settings.setUserAgentString(settings.getUserAgentString() + " COLORJET-ERP-Native/1.7.0");
+        settings.setUserAgentString(settings.getUserAgentString() + " COLORJET-ERP-Native/1.7.1");
         CookieManager.getInstance().setAcceptCookie(true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
@@ -88,6 +87,8 @@ public final class MainActivity extends Activity {
             @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) { loadingIndicator.setVisibility(View.VISIBLE); }
             @Override public void onPageFinished(WebView view, String url) {
                 loadingIndicator.setVisibility(View.GONE);
+                String nativeCss = "(function(){var s=document.getElementById('colorjet-native-style');if(!s){s=document.createElement('style');s.id='colorjet-native-style';s.textContent='.mobile-bottom-nav{display:none!important}body{padding-bottom:0!important}.main-content{padding-bottom:16px!important}';document.head.appendChild(s);}})();";
+                view.evaluateJavascript(nativeCss, null);
                 String status = permissionStatusJson().replace("\\", "\\\\").replace("'", "\\'");
                 view.evaluateJavascript("window.dispatchEvent(new CustomEvent('colorjet-native-ready',{detail:" + status + "}));", null);
             }
@@ -234,7 +235,7 @@ public final class MainActivity extends Activity {
         try {
             JSONObject status = new JSONObject();
             status.put("platform", "android");
-            status.put("version", "1.7.0");
+            status.put("version", "1.7.1");
             status.put("fine_location", checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED);
             status.put("background_location", Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED);
             status.put("notifications", Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED);
