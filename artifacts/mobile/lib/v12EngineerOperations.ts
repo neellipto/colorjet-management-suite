@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { getSupabase } from '@/lib/supabaseClient';
 
 export type VisitStatus =
@@ -197,6 +198,13 @@ export async function createCustomerVisit(input: CreateVisitInput): Promise<Cust
 }
 
 export async function transitionCustomerVisit(input: VisitTransitionInput): Promise<CustomerVisit> {
+  if (input.newStatus === 'travelling' && Platform.OS !== 'web') {
+    const { requestFieldLocationPermissions } = await import('@/lib/backgroundLocation');
+    const permission = await requestFieldLocationPermissions();
+    if (!permission.foreground) throw new Error('Precise location permission is required before starting travel.');
+    if (!permission.background) throw new Error('Allow all-the-time location access before starting travel.');
+  }
+
   const { data, error } = await getSupabase().rpc('v12_transition_visit', {
     p_visit_id: input.visitId,
     p_new_status: input.newStatus,
