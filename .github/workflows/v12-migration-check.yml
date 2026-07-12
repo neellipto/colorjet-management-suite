@@ -44,6 +44,7 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
           create role authenticated nologin;
+          create role service_role nologin;
           create schema auth;
           create table auth.users (
             id uuid primary key,
@@ -82,6 +83,11 @@ jobs:
             created_by uuid,
             created_at timestamptz not null default timezone('utc', now())
           );
+          create table public.warehouses (
+            id uuid primary key default gen_random_uuid(),
+            code text not null unique,
+            name text not null
+          );
           SQL
 
       - name: Apply V12 engineer operations migration
@@ -95,6 +101,9 @@ jobs:
 
       - name: Apply V13 parts and stock migration
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712121000_v13_parts_stock_workflow.sql
+
+      - name: Apply V13 reservation correction
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712121500_v13_parts_dispatch_reservation_fix.sql
 
       - name: Apply V13 tasks, import, HR and biometric migration
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712122000_v13_tasks_import_hr_biometric.sql
@@ -122,6 +131,9 @@ jobs:
             end if;
             if to_regclass('public.v13_parts_reservations') is null then
               raise exception 'v13_parts_reservations missing';
+            end if;
+            if to_regprocedure('public.v13_create_parts_dispatch(uuid,uuid,text,uuid,text,text,text,numeric,timestamp with time zone,jsonb)') is null then
+              raise exception 'v13_create_parts_dispatch missing';
             end if;
             if to_regclass('public.v13_office_tasks') is null then
               raise exception 'v13_office_tasks missing';
