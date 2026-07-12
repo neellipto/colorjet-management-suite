@@ -87,7 +87,17 @@ public final class MainActivity extends Activity {
             @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) { loadingIndicator.setVisibility(View.VISIBLE); }
             @Override public void onPageFinished(WebView view, String url) {
                 loadingIndicator.setVisibility(View.GONE);
-                String nativeCss = "(function(){var s=document.getElementById('colorjet-native-style');if(!s){s=document.createElement('style');s.id='colorjet-native-style';s.textContent='.mobile-bottom-nav{display:none!important}body{padding-bottom:0!important}.main-content{padding-bottom:16px!important}';document.head.appendChild(s);}})();";
+                String nativeCss = "(function(){"
+                    + "function hideDuplicateWebNav(){"
+                    + "var nodes=document.querySelectorAll('nav,footer,[role=navigation],div');"
+                    + "for(var i=0;i<nodes.length;i++){var e=nodes[i],t=(e.innerText||'').replace(/\\s+/g,' ').trim();"
+                    + "if(t.length<100&&t.indexOf('Home')>=0&&t.indexOf('Attendance')>=0&&t.indexOf('Alerts')>=0&&t.indexOf('Messages')>=0&&t.indexOf('More')>=0){"
+                    + "var r=e.getBoundingClientRect(),p=getComputedStyle(e).position;"
+                    + "if(r.bottom>=innerHeight-24&&(p==='fixed'||p==='sticky'||e.tagName==='NAV'||e.tagName==='FOOTER')){e.style.setProperty('display','none','important');}"
+                    + "}}document.body.style.setProperty('padding-bottom','0','important');"
+                    + "var m=document.querySelector('.main-content');if(m)m.style.setProperty('padding-bottom','16px','important');"
+                    + "}hideDuplicateWebNav();new MutationObserver(hideDuplicateWebNav).observe(document.body,{childList:true,subtree:true});"
+                    + "})();";
                 view.evaluateJavascript(nativeCss, null);
                 String status = permissionStatusJson().replace("\\", "\\\\").replace("'", "\\'");
                 view.evaluateJavascript("window.dispatchEvent(new CustomEvent('colorjet-native-ready',{detail:" + status + "}));", null);
