@@ -38,6 +38,16 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
+      - name: Generate Android launcher icons from supplied original artwork
+        run: |
+          base64 --decode branding/colorjet-original-launcher.png.b64 > /tmp/colorjet-launcher.png
+          for spec in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
+            density="${spec%%:*}"
+            size="${spec##*:}"
+            mkdir -p "app/src/main/res/mipmap-${density}"
+            convert /tmp/colorjet-launcher.png -resize "${size}x${size}" "app/src/main/res/mipmap-${density}/ic_launcher.png"
+            cp "app/src/main/res/mipmap-${density}/ic_launcher.png" "app/src/main/res/mipmap-${density}/ic_launcher_round.png"
+          done
       - name: Prepare production keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.COLORJET_ANDROID_KEYSTORE_BASE64 }}
