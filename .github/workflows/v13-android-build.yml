@@ -1,4 +1,4 @@
-name: V13 Android APK Build
+name: V13 Standalone Android APK Build
 
 on:
   push:
@@ -55,14 +55,14 @@ jobs:
         env:
           CI: "1"
         run: pnpm exec expo prebuild --platform android --clean
-      - name: Compile installable debug APK
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Compile standalone bundled test APK
+        run: ./gradlew assembleRelease --stacktrace
         working-directory: artifacts/mobile/android
       - name: Generate checksum
-        run: sha256sum android/app/build/outputs/apk/debug/app-debug.apk > V13-checksums.sha256
+        run: sha256sum android/app/build/outputs/apk/release/app-release.apk > V13-standalone-checksums.sha256
       - uses: actions/upload-artifact@v4
         with:
-          name: COLORJET-ERP-V13-Debug-APK
+          name: COLORJET-ERP-V13-Standalone-Test-APK
           path: |
             artifacts/mobile/android/app/build/outputs/apk/debug/app-debug.apk
             artifacts/mobile/V13-checksums.sha256
