@@ -148,7 +148,7 @@ async function handleLocations(locations: Location.LocationObject[]): Promise<vo
   }
 }
 
-if (Platform.OS !== 'web' && !TaskManager.isTaskDefined(FIELD_LOCATION_TASK)) {
+if (Platform.OS === 'android' && !TaskManager.isTaskDefined(FIELD_LOCATION_TASK)) {
   TaskManager.defineTask(FIELD_LOCATION_TASK, async ({ data, error }) => {
     if (error) return;
     const payload = data as { locations?: Location.LocationObject[] } | undefined;
@@ -171,7 +171,7 @@ export async function requestFieldLocationPermissions(): Promise<{
   foreground: boolean;
   background: boolean;
 }> {
-  if (Platform.OS === 'web') return { foreground: false, background: false };
+  if (Platform.OS !== 'android') return { foreground: false, background: false };
 
   const foreground = await Location.requestForegroundPermissionsAsync();
   if (foreground.status !== Location.PermissionStatus.GRANTED) {
@@ -209,7 +209,7 @@ export async function startFieldLocationTracking(input: {
   userId: string;
   deviceId?: string;
 }): Promise<ActiveTrackingState> {
-  if (Platform.OS === 'web') throw new Error('Background tracking requires the Android app.');
+  if (Platform.OS !== 'android') throw new Error('Background tracking requires the Android app.');
 
   const permissions = await requestFieldLocationPermissions();
   if (!permissions.foreground) throw new Error('Location permission was denied.');
@@ -250,7 +250,7 @@ export async function startFieldLocationTracking(input: {
 }
 
 export async function stopFieldLocationTracking(): Promise<void> {
-  if (Platform.OS !== 'web') {
+  if (Platform.OS === 'android') {
     const running = await Location.hasStartedLocationUpdatesAsync(FIELD_LOCATION_TASK);
     if (running) await Location.stopLocationUpdatesAsync(FIELD_LOCATION_TASK);
   }
