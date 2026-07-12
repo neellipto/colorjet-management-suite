@@ -26,7 +26,7 @@ function MenuItem({ icon, label, subtitle, onPress, iconBg, iconColor, badge }: 
       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
       activeOpacity={0.75}
     >
-      <View style={[styles.menuIcon, { backgroundColor: iconBg ?? colors.navyLight }]}> 
+      <View style={[styles.menuIcon, { backgroundColor: iconBg ?? colors.navyLight }]}>
         <Feather name={icon} size={20} color={iconColor ?? colors.primary} />
       </View>
       <View style={styles.menuText}>
@@ -75,8 +75,8 @@ export default function MoreScreen() {
       contentContainerStyle={{ paddingTop: pt + 16, paddingBottom: pb, paddingHorizontal: 16, gap: 8 }}
       showsVerticalScrollIndicator={false}
     >
-      <View style={[styles.userCard, { backgroundColor: colors.primary }]}> 
-        <View style={[styles.userAvatar, { backgroundColor: 'rgba(255,255,255,0.2)' }]}> 
+      <View style={[styles.userCard, { backgroundColor: colors.primary }]}>
+        <View style={[styles.userAvatar, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
           <Feather name="user" size={24} color="#fff" />
         </View>
         <View style={styles.userInfo}>
