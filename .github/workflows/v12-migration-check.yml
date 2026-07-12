@@ -2,7 +2,7 @@ name: V12 Migration Check
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feature/v12-engineer-operations]
     paths:
       - 'supabase/migrations/20260712*_v12_*.sql'
       - '.github/workflows/v12-migration-check.yml'
@@ -64,11 +64,14 @@ jobs:
           );
           SQL
 
-      - name: Apply V12 engineer operations migration
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712101800_v12_engineer_operations.sql
-
-      - name: Apply V12 transactional parts migration
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712111000_v12_parts_request_rpc.sql
+      - name: Apply V12 migrations in order
+        shell: bash
+        run: |
+          set -euo pipefail
+          for migration in $(find supabase/migrations -maxdepth 1 -type f -name '20260712*_v12_*.sql' | sort); do
+            echo "Applying ${migration}"
+            psql -v ON_ERROR_STOP=1 -f "${migration}"
+          done
 
       - name: Verify required V12 objects
         shell: bash
@@ -82,11 +85,23 @@ jobs:
             if to_regclass('public.v12_location_points') is null then
               raise exception 'v12_location_points missing';
             end if;
+            if to_regclass('public.v12_service_tickets') is null then
+              raise exception 'v12_service_tickets missing';
+            end if;
+            if to_regclass('public.v12_warranty_registrations') is null then
+              raise exception 'v12_warranty_registrations missing';
+            end if;
             if to_regprocedure('public.v12_transition_visit(uuid,text,text,double precision,double precision,double precision,text,text)') is null then
               raise exception 'v12_transition_visit missing';
             end if;
             if to_regprocedure('public.v12_create_parts_request(uuid,uuid,text,text,text,timestamp with time zone,jsonb)') is null then
               raise exception 'v12_create_parts_request missing';
+            end if;
+            if to_regprocedure('public.v12p2_create_service_ticket(uuid,uuid,text,text,text,text,text,text,text,text,text,uuid,timestamp with time zone,integer,integer,integer,text)') is null then
+              raise exception 'v12p2_create_service_ticket missing';
+            end if;
+            if to_regprocedure('public.v12p2_scan_sla_breaches()') is null then
+              raise exception 'v12p2_scan_sla_breaches missing';
             end if;
           end;
           $$;
