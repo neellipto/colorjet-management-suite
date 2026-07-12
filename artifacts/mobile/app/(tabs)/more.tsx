@@ -102,6 +102,7 @@ export default function MoreScreen() {
       {(isAdmin || isServiceControl) && (
         <>
           <SectionLabel label="SERVICE OPERATIONS" />
+          <MenuItem icon="shield" label="Service & Warranty V12" subtitle="Tickets, coverage, diagnostics, costs and SLA alerts" onPress={() => router.push('/service-warranty' as any)} iconBg="#E8EAF6" iconColor="#3949AB" />
           <MenuItem icon="activity" label="Field Operations V12" subtitle="Live travel, GPS check-in, SLA and route audit" onPress={() => router.push('/field-operations' as any)} iconBg="#E3F2FD" iconColor="#1565C0" />
           <MenuItem icon="monitor" label="Service Control" subtitle="Live ticket dashboard" onPress={() => router.push('/service-control' as any)} iconBg={colors.navyLight} iconColor={colors.primary} />
           <MenuItem icon="calendar" label="Engineer Schedule" subtitle="Plan and track visits" onPress={() => router.push('/schedule' as any)} iconBg="#E8F5E9" iconColor="#2E7D32" />
@@ -127,6 +128,7 @@ export default function MoreScreen() {
       {isEngineer && (
         <>
           <SectionLabel label="ENGINEER OPERATIONS" />
+          <MenuItem icon="shield" label="My Service Tickets" subtitle="Assigned ticket, warranty and SLA status" onPress={() => router.push('/service-warranty' as any)} iconBg="#E8EAF6" iconColor="#3949AB" />
           <MenuItem icon="navigation" label="My Field Visits" subtitle="Travel, check-in, work and customer confirmation" onPress={() => router.push('/field-operations' as any)} iconBg="#E3F2FD" iconColor="#1565C0" />
           <MenuItem icon="calendar" label="My Schedule" subtitle="Assigned customer visits" onPress={() => router.push('/schedule' as any)} iconBg="#E8F5E9" iconColor="#2E7D32" />
         </>
@@ -185,7 +187,7 @@ export default function MoreScreen() {
         <Text style={[styles.logoutText, { color: '#C62828' }]}>Sign Out</Text>
       </TouchableOpacity>
 
-      <Text style={[styles.version, { color: colors.mutedForeground }]}>COLORJET ERP V12 Engineer Operations · Bangladesh</Text>
+      <Text style={[styles.version, { color: colors.mutedForeground }]}>COLORJET ERP V12 Phase 2 · Bangladesh</Text>
     </ScrollView>
   );
 }
