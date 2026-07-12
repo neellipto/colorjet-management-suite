@@ -42,8 +42,11 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        getWindow().setStatusBarColor(Color.rgb(10, 16, 26));
-        getWindow().setNavigationBarColor(Color.rgb(10, 16, 26));
+        getWindow().setStatusBarColor(Color.rgb(247, 251, 255));
+        getWindow().setNavigationBarColor(Color.WHITE);
+        getWindow().getDecorView().setSystemUiVisibility(
+            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        );
         setContentView(R.layout.activity_main);
 
         webView = findViewById(R.id.erp_webview);
@@ -54,7 +57,7 @@ public final class MainActivity extends Activity {
         findViewById(R.id.nav_attendance).setOnClickListener(v -> loadUrl(getString(R.string.attendance_url)));
         findViewById(R.id.nav_notifications).setOnClickListener(v -> loadUrl(getString(R.string.notifications_url)));
         findViewById(R.id.nav_messages).setOnClickListener(v -> loadUrl(getString(R.string.messages_url)));
-        findViewById(R.id.nav_more).setOnClickListener(v -> showMoreMenu());
+        findViewById(R.id.nav_more).setOnClickListener(v -> openPremiumMore());
 
         if (savedInstanceState != null) webView.restoreState(savedInstanceState);
         else loadUrl(getString(R.string.dashboard_url));
@@ -128,6 +131,17 @@ public final class MainActivity extends Activity {
     private void loadUrl(String url) {
         loadingIndicator.setVisibility(View.VISIBLE);
         webView.loadUrl(url);
+    }
+
+    private void openPremiumMore() {
+        String script = "(function(){var all=document.querySelectorAll('a,button,[role=button]');"
+            + "for(var i=0;i<all.length;i++){var t=(all[i].innerText||'').trim();"
+            + "if(t==='More'||t.endsWith('\\nMore')){all[i].click();return 'opened';}}return 'missing';})()";
+        webView.evaluateJavascript(script, result -> {
+            if (result == null || result.contains("missing")) {
+                loadUrl(base("/mobile?tab=more"));
+            }
+        });
     }
 
     private void showMoreMenu() {
