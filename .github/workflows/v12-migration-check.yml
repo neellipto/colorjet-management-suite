@@ -1,0 +1,93 @@
+name: V12 Migration Check
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/20260712*_v12_*.sql'
+      - '.github/workflows/v12-migration-check.yml'
+  workflow_dispatch:
+
+jobs:
+  postgres-migration-smoke-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: colorjet_v12_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d colorjet_v12_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PGPASSWORD: postgres
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGDATABASE: colorjet_v12_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bootstrap Supabase-compatible auth objects
+        shell: bash
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          create role authenticated nologin;
+          create schema auth;
+          create table auth.users (
+            id uuid primary key,
+            email text
+          );
+          create or replace function auth.uid()
+          returns uuid
+          language sql
+          stable
+          as $$
+            select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+          $$;
+          create table public.roles (
+            id uuid primary key,
+            code text not null unique
+          );
+          create table public.user_roles (
+            user_id uuid not null references auth.users(id),
+            role_id uuid not null references public.roles(id),
+            primary key (user_id, role_id)
+          );
+          SQL
+
+      - name: Apply V12 engineer operations migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712101800_v12_engineer_operations.sql
+
+      - name: Apply V12 transactional parts migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712111000_v12_parts_request_rpc.sql
+
+      - name: Verify required V12 objects
+        shell: bash
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          do $$
+          begin
+            if to_regclass('public.v12_customer_visits') is null then
+              raise exception 'v12_customer_visits missing';
+            end if;
+            if to_regclass('public.v12_location_points') is null then
+              raise exception 'v12_location_points missing';
+            end if;
+            if to_regprocedure('public.v12_transition_visit(uuid,text,text,double precision,double precision,double precision,text,text)') is null then
+              raise exception 'v12_transition_visit missing';
+            end if;
+            if to_regprocedure('public.v12_create_parts_request(uuid,uuid,text,text,text,timestamp with time zone,jsonb)') is null then
+              raise exception 'v12_create_parts_request missing';
+            end if;
+          end;
+          $$;
+          SQL
