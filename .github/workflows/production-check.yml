@@ -2,9 +2,14 @@ name: Production Check
 
 on:
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - feature/v12-engineer-operations
   push:
-    branches: [supabase-production-migration]
+    branches:
+      - feature/v13-service-business-operations
+      - supabase-production-migration
+  workflow_dispatch:
 
 jobs:
   mobile-web-build:
@@ -16,7 +21,7 @@ jobs:
           version: 9
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
       - run: pnpm install --no-frozen-lockfile
       - name: TypeScript check
@@ -31,4 +36,5 @@ jobs:
           name: mobile-typecheck-report
           path: mobile-typecheck.log
           if-no-files-found: warn
-      - run: pnpm --filter @workspace/mobile run build
+      - name: Build production web bundle
+        run: pnpm --filter @workspace/mobile run build
