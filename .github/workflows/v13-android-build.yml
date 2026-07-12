@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: v13-android-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-debug-apk:
