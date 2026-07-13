@@ -31,6 +31,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.7"
+      - name: Install image processing dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
       - name: Generate Android launcher icons from supplied original artwork
         run: |
           base64 --decode branding/colorjet-original-launcher.png.b64 > /tmp/colorjet-launcher.png
