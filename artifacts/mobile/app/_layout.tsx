@@ -50,6 +50,8 @@ function RootLayoutNav() {
       <Stack.Screen name="reports" options={{ title: "Reports", headerBackTitle: "Back" }} />
       <Stack.Screen name="expenses" options={{ title: "Expenses", headerBackTitle: "Back" }} />
       <Stack.Screen name="delivery" options={{ title: "Deliveries", headerBackTitle: "Back" }} />
+      <Stack.Screen name="attendance" options={{ title: "Attendance & Duty Route", headerBackTitle: "Back" }} />
+      <Stack.Screen name="operations/[module]" options={{ title: "COLORJET Operations", headerBackTitle: "Back" }} />
       <Stack.Screen name="profile" options={{ title: "My Profile", headerBackTitle: "Back" }} />
       <Stack.Screen name="notifications" options={{ title: "Notifications", headerBackTitle: "Back" }} />
       <Stack.Screen name="schedule" options={{ title: "Engineer Schedule", headerBackTitle: "Back" }} />
@@ -88,7 +90,7 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <AppProvider>
-            <GestureHandlerRootView>
+            <GestureHandlerRootView style={{ flex: 1 }}>
               <KeyboardProvider>
                 <RootLayoutNav />
               </KeyboardProvider>
