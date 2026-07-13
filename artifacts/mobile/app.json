@@ -2,7 +2,7 @@
   "expo": {
     "name": "COLORJET Management Suite",
     "slug": "colorjet-management-suite",
-    "version": "3.0.0",
+    "version": "3.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "colorjetmanagementsuite",
@@ -23,7 +23,7 @@
     },
     "android": {
       "package": "com.colorjetbd.managementsuite",
-      "versionCode": 3001,
+      "versionCode": 3002,
       "minSdkVersion": 24,
       "targetSdkVersion": 35,
       "permissions": [
@@ -48,7 +48,7 @@
       [
         "expo-router",
         {
-          "origin": "https://replit.com/"
+          "origin": "https://erp.colorjetbd.com"
         }
       ],
       "expo-font",
