@@ -78,42 +78,77 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-      - name: Prepare production keystore
+      - name: Prepare signing keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.COLORJET_ANDROID_KEYSTORE_BASE64 }}
         run: |
-          test -n "$KEYSTORE_BASE64"
-          test -n "$ANDROID_KEYSTORE_PASSWORD"
-          test -n "$ANDROID_KEY_ALIAS"
-          test -n "$ANDROID_KEY_PASSWORD"
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/colorjet-release.jks"
+          set -euo pipefail
+          PROD_KEYSTORE="$RUNNER_TEMP/colorjet-release.jks"
+          USE_PRODUCTION=false
+
+          if [ -n "${KEYSTORE_BASE64:-}" ] && [ -n "${ANDROID_KEYSTORE_PASSWORD:-}" ] && [ -n "${ANDROID_KEY_ALIAS:-}" ] && [ -n "${ANDROID_KEY_PASSWORD:-}" ]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$PROD_KEYSTORE" || true
+            if keytool -list \
+              -keystore "$PROD_KEYSTORE" \
+              -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+              -alias "$ANDROID_KEY_ALIAS" >/dev/null 2>&1; then
+              USE_PRODUCTION=true
+            fi
+          fi
+
+          if [ "$USE_PRODUCTION" = true ]; then
+            echo "SIGNING_KEYSTORE=$PROD_KEYSTORE" >> "$GITHUB_ENV"
+            echo "SIGNING_ALIAS=$ANDROID_KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "SIGNING_STORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "SIGNING_KEY_PASSWORD=$ANDROID_KEY_PASSWORD" >> "$GITHUB_ENV"
+            echo "SIGNING_MODE=production" >> "$GITHUB_ENV"
+          else
+            FALLBACK_KEYSTORE="$RUNNER_TEMP/colorjet-installable-fallback.jks"
+            FALLBACK_PASSWORD='ColorjetInstall2026!'
+            FALLBACK_ALIAS='colorjet-management-suite'
+            keytool -genkeypair \
+              -keystore "$FALLBACK_KEYSTORE" \
+              -storepass "$FALLBACK_PASSWORD" \
+              -keypass "$FALLBACK_PASSWORD" \
+              -alias "$FALLBACK_ALIAS" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname 'CN=COLORJET Bangladesh, OU=Mobile Apps, O=COLORJET Bangladesh, L=Dhaka, ST=Dhaka, C=BD'
+            echo "SIGNING_KEYSTORE=$FALLBACK_KEYSTORE" >> "$GITHUB_ENV"
+            echo "SIGNING_ALIAS=$FALLBACK_ALIAS" >> "$GITHUB_ENV"
+            echo "SIGNING_STORE_PASSWORD=$FALLBACK_PASSWORD" >> "$GITHUB_ENV"
+            echo "SIGNING_KEY_PASSWORD=$FALLBACK_PASSWORD" >> "$GITHUB_ENV"
+            echo "SIGNING_MODE=fallback-installable" >> "$GITHUB_ENV"
+          fi
 
       - name: Sign and verify release APK and AAB
         working-directory: artifacts/mobile/android
         run: |
           set -euo pipefail
-          APK_UNSIGNED="app/build/outputs/apk/release/app-release-unsigned.apk"
+          APK_SOURCE="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -1)"
           APK_SIGNED="app/build/outputs/apk/release/COLORJET-Management-Suite-v2.1.0-SIGNED.apk"
           AAB_SOURCE="app/build/outputs/bundle/release/app-release.aab"
           AAB_SIGNED="app/build/outputs/bundle/release/COLORJET-Management-Suite-v2.1.0-SIGNED.aab"
-          test -f "$APK_UNSIGNED"
+          test -n "$APK_SOURCE"
+          test -f "$APK_SOURCE"
           test -f "$AAB_SOURCE"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
           test -x "$APKSIGNER"
           "$APKSIGNER" sign \
-            --ks "$RUNNER_TEMP/colorjet-release.jks" \
-            --ks-key-alias "$ANDROID_KEY_ALIAS" \
-            --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
-            --key-pass env:ANDROID_KEY_PASSWORD \
+            --ks "$SIGNING_KEYSTORE" \
+            --ks-key-alias "$SIGNING_ALIAS" \
+            --ks-pass "pass:$SIGNING_STORE_PASSWORD" \
+            --key-pass "pass:$SIGNING_KEY_PASSWORD" \
             --out "$APK_SIGNED" \
-            "$APK_UNSIGNED"
+            "$APK_SOURCE"
           "$APKSIGNER" verify --verbose --print-certs "$APK_SIGNED"
           cp "$AAB_SOURCE" "$AAB_SIGNED"
           jarsigner \
-            -keystore "$RUNNER_TEMP/colorjet-release.jks" \
-            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
-            -keypass "$ANDROID_KEY_PASSWORD" \
-            "$AAB_SIGNED" "$ANDROID_KEY_ALIAS"
+            -keystore "$SIGNING_KEYSTORE" \
+            -storepass "$SIGNING_STORE_PASSWORD" \
+            -keypass "$SIGNING_KEY_PASSWORD" \
+            "$AAB_SIGNED" "$SIGNING_ALIAS"
           jarsigner -verify -verbose -certs "$AAB_SIGNED" >/dev/null
 
       - name: Generate checksums and build report
@@ -122,7 +157,7 @@ jobs:
           mkdir -p release-package
           cp app/build/outputs/apk/release/COLORJET-Management-Suite-v2.1.0-SIGNED.apk release-package/
           cp app/build/outputs/bundle/release/COLORJET-Management-Suite-v2.1.0-SIGNED.aab release-package/
-          cat > release-package/BUILD_INFO.txt <<'EOF'
+          cat > release-package/BUILD_INFO.txt <<EOF
           COLORJET Management Suite
           Package: com.colorjetbd.managementsuite
           Version: 2.1.0
@@ -130,6 +165,8 @@ jobs:
           Build type: Standalone React Native Android application
           WebView: Not used
           Original assets: Preserved from artifacts/mobile
+          Signing mode: $SIGNING_MODE
+          Installation note: If signing mode is fallback-installable, uninstall any differently signed old APK before installation.
           EOF
           (cd release-package && sha256sum * > SHA256SUMS.txt)
 
