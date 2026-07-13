@@ -1,0 +1,187 @@
+name: Build COLORJET Management Suite V3.1 Final Merge
+
+on:
+  push:
+    branches: [managementsuite-v17-merged-build]
+    paths:
+      - 'build-source-v17/**'
+      - '.github/workflows/build-managementsuite-v31-final.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'build-source-v17/**'
+      - '.github/workflows/build-managementsuite-v31-final.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Reconstruct exact verified merged source
+        run: |
+          set -euo pipefail
+          mkdir -p build/mobile
+          cat \
+            build-source-v17/source.part.00 \
+            build-source-v17/source.part.01 \
+            build-source-v17/source.part.02 \
+            build-source-v17/source.part.030 \
+            build-source-v17/source.part.031 \
+            build-source-v17/source.part.032 \
+            build-source-v17/source.part.040 \
+            build-source-v17/source.part.041 \
+            build-source-v17/source.part.042 \
+            build-source-v17/source.part.05 \
+            build-source-v17/source.part.060 \
+            build-source-v17/source.part.061 \
+            build-source-v17/source.part.062 \
+            build-source-v17/source.part.070 \
+            build-source-v17/source.part.071 \
+            build-source-v17/source.part.072 \
+            build-source-v17/source.part.080 \
+            build-source-v17/source.part.081 \
+            build-source-v17/source.part.082 \
+            build-source-v17/source.part.090 \
+            build-source-v17/source.part.091 \
+            | base64 --decode > "$RUNNER_TEMP/source.tar.gz"
+          echo "06af5f6ca339af0620a88cd466ba87d4ef38baebd40ec601eb96605c79bee4cd  $RUNNER_TEMP/source.tar.gz" | sha256sum -c -
+          gzip -t "$RUNNER_TEMP/source.tar.gz"
+          tar -xzf "$RUNNER_TEMP/source.tar.gz" -C build/mobile
+          cp -a build-source-v17/patches/. build/mobile/
+          test -f build/mobile/package.json
+          test -f build/mobile/app.json
+          test -f build/mobile/src/core/moduleRegistry.ts
+          ! grep -R --exclude-dir=node_modules --exclude-dir=android --exclude='*.md' -n 'ridaa\.xyz' build/mobile
+
+      - name: Install and validate merged source
+        working-directory: build/mobile
+        run: |
+          pnpm install --no-frozen-lockfile
+          pnpm run typecheck
+          CI=1 pnpm exec expo install --check
+          CI=1 pnpm exec expo prebuild --platform android --clean --no-install
+
+      - name: Compile fresh release APK and AAB
+        working-directory: build/mobile/android
+        run: |
+          set -o pipefail
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace 2>&1 | tee ../gradle-build.log
+
+      - name: Upload Gradle diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: COLORJET-V3.1-FINAL-GRADLE-LOG
+          path: build/mobile/gradle-build.log
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Generate isolated release signing key
+        run: |
+          set -euo pipefail
+          KEYSTORE="$RUNNER_TEMP/colorjet-v31-final.jks"
+          PASSWORD="$(openssl rand -hex 24)"
+          ALIAS='colorjet-v31-final'
+          keytool -genkeypair \
+            -keystore "$KEYSTORE" \
+            -storepass "$PASSWORD" \
+            -keypass "$PASSWORD" \
+            -alias "$ALIAS" \
+            -keyalg RSA \
+            -keysize 3072 \
+            -validity 10000 \
+            -dname 'CN=COLORJET Bangladesh, OU=Mobile Apps, O=COLORJET Bangladesh, L=Dhaka, ST=Dhaka, C=BD'
+          echo "SIGNING_KEYSTORE=$KEYSTORE" >> "$GITHUB_ENV"
+          echo "SIGNING_PASSWORD=$PASSWORD" >> "$GITHUB_ENV"
+          echo "SIGNING_ALIAS=$ALIAS" >> "$GITHUB_ENV"
+
+      - name: Sign and verify release
+        working-directory: build/mobile
+        run: |
+          set -euo pipefail
+          mkdir -p release-package
+          APK_SOURCE="$(find android/app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -1)"
+          AAB_SOURCE="$(find android/app/build/outputs/bundle/release -maxdepth 1 -type f -name '*.aab' | head -1)"
+          test -f "$APK_SOURCE"
+          test -f "$AAB_SOURCE"
+
+          APK='release-package/COLORJET-Management-Suite-v3.1.0-FINAL-MERGED-SIGNED.apk'
+          AAB='release-package/COLORJET-Management-Suite-v3.1.0-FINAL-MERGED-SIGNED.aab'
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
+
+          "$APKSIGNER" sign \
+            --ks "$SIGNING_KEYSTORE" \
+            --ks-key-alias "$SIGNING_ALIAS" \
+            --ks-pass "pass:$SIGNING_PASSWORD" \
+            --key-pass "pass:$SIGNING_PASSWORD" \
+            --out "$APK" \
+            "$APK_SOURCE"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee release-package/APK_SIGNATURE.txt
+
+          cp "$AAB_SOURCE" "$AAB"
+          jarsigner \
+            -keystore "$SIGNING_KEYSTORE" \
+            -storepass "$SIGNING_PASSWORD" \
+            -keypass "$SIGNING_PASSWORD" \
+            "$AAB" \
+            "$SIGNING_ALIAS"
+          jarsigner -verify -verbose -certs "$AAB" >/dev/null
+
+          zip -qr release-package/COLORJET-MANAGEMENT-SUITE-V3.1-FINAL-MERGED-SOURCE.zip . \
+            -x 'node_modules/*' 'android/*' '.expo/*' 'release-package/*'
+
+          cat > release-package/BUILD_INFO.txt <<'EOF'
+          COLORJET Management Suite V3.1.0 — Final Merged Build
+          Package: com.colorjetbd.managementsuite
+          Version: 3.1.0
+          Version Code: 3100
+          Source: Fresh V16 UI + V3 cPanel API/security merge
+          Module definitions: 53
+          Specialized screens: Attendance, Visits, RMA, Shipments, Ledger
+          Other modules: role-aware cPanel list/create contracts
+          Reused old APK: No
+          Hardcoded Replit endpoint: No
+          Embedded employee image seed: Removed
+          WebView: No
+          TypeScript validation: Passed
+          Expo dependency validation: Passed
+          Android prebuild: Fresh
+          Gradle APK/AAB compile: Passed
+          Signing mode: isolated ephemeral release key
+          Live cPanel runtime: Not tested in CI
+          Physical Android device runtime: Not tested in CI
+          Update compatibility: Existing app update is not guaranteed because the original production keystore was not used.
+          EOF
+
+          (cd release-package && sha256sum COLORJET-* APK_SIGNATURE.txt BUILD_INFO.txt > SHA256SUMS.txt)
+
+      - name: Upload final merged release
+        uses: actions/upload-artifact@v4
+        with:
+          name: COLORJET-MANAGEMENT-SUITE-V3.1-FINAL-APK-AAB-SOURCE
+          path: build/mobile/release-package/*
+          if-no-files-found: error
+          retention-days: 30
