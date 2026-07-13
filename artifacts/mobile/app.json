@@ -2,7 +2,7 @@
   "expo": {
     "name": "COLORJET Management Suite",
     "slug": "colorjet-management-suite",
-    "version": "2.1.0",
+    "version": "3.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "colorjetmanagementsuite",
@@ -16,12 +16,14 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.colorjetbd.managementsuite",
       "infoPlist": {
-        "UIBackgroundModes": ["location"]
+        "UIBackgroundModes": [
+          "location"
+        ]
       }
     },
     "android": {
       "package": "com.colorjetbd.managementsuite",
-      "versionCode": 3,
+      "versionCode": 3001,
       "minSdkVersion": 24,
       "targetSdkVersion": 35,
       "permissions": [
