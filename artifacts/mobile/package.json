@@ -1,13 +1,15 @@
 {
   "name": "@workspace/mobile",
-  "version": "1.0.0",
+  "version": "2.1.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
     "dev": "EXPO_PUBLIC_BASE_PATH=/ npx expo start --web --port 5000 --host 0.0.0.0",
     "build": "node scripts/build.js",
     "serve": "node server/serve.js",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "test:form-routes": "node scripts/test-form-routes.mjs",
+    "test": "npm run test:form-routes"
   },
   "dependencies": {
     "@babel/runtime": "^8.0.0",
@@ -15,16 +17,24 @@
     "@expo/vector-icons": "^14.0.0",
     "@opentelemetry/api": "^1.9.0",
     "@react-native-async-storage/async-storage": "^1.23.1",
+    "@react-native/assets-registry": "0.74.84",
+    "@react-native/gradle-plugin": "0.74.84",
     "@supabase/supabase-js": "^2.57.0",
     "@tanstack/react-query": "^5.28.6",
     "@workspace/api-client-react": "workspace:*",
     "expo": "~51.0.0",
+    "expo-asset": "~10.0.10",
     "expo-blur": "~13.0.2",
+    "expo-constants": "~16.0.2",
     "expo-font": "~12.0.7",
     "expo-haptics": "~13.0.1",
     "expo-image-picker": "~15.0.5",
+    "expo-linking": "~6.3.1",
+    "expo-location": "~17.0.1",
     "expo-router": "~3.5.14",
     "expo-splash-screen": "~0.27.4",
+    "expo-status-bar": "~1.12.1",
+    "expo-task-manager": "~11.8.1",
     "expo-web-browser": "~13.0.3",
     "react": "18.2.0",
     "react-dom": "18.2.0",
@@ -41,6 +51,7 @@
     "@babel/core": "^7.24.0",
     "@types/node": "^22.10.1",
     "@types/react": "~18.2.79",
+    "babel-preset-expo": "~11.0.5",
     "typescript": "^5.3.0"
   }
 }

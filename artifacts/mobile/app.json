@@ -1,21 +1,45 @@
 {
   "expo": {
-    "name": "COLORJET ERP",
-    "slug": "mobile",
-    "version": "1.0.0",
+    "name": "COLORJET Management Suite",
+    "slug": "colorjet-management-suite",
+    "version": "3.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
-    "userInterfaceStyle": "automatic",
+    "scheme": "colorjetmanagementsuite",
+    "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/images/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#1A237E"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.colorjetbd.managementsuite",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "location"
+        ]
+      }
     },
-    "android": {},
+    "android": {
+      "package": "com.colorjetbd.managementsuite",
+      "versionCode": 3002,
+      "minSdkVersion": 24,
+      "targetSdkVersion": 35,
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.VIBRATE"
+      ]
+    },
     "web": {
       "favicon": "./assets/images/favicon.png",
       "bundler": "metro"
@@ -24,10 +48,16 @@
       [
         "expo-router",
         {
-          "origin": "https://replit.com/"
+          "origin": "https://erp.colorjetbd.com"
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow COLORJET Management Suite to record duty and customer-visit routes while an active work session is running."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
