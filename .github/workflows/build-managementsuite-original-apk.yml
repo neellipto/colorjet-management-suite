@@ -92,11 +92,11 @@ jobs:
         working-directory: artifacts/mobile/android
         run: |
           set -euo pipefail
-          APK_UNSIGNED="app/build/outputs/apk/release/app-release-unsigned.apk"
-          APK_SIGNED="app/build/outputs/apk/release/COLORJET-Management-Suite-v2.1.0-SIGNED.apk"
+          APK_SOURCE="$(find app/build/outputs/apk/release -maxdepth 1 -type f \( -name 'app-release-unsigned.apk' -o -name 'app-release.apk' \) | head -1)"
+          APK_SIGNED="app/build/outputs/apk/release/COLORJET-Management-Suite-v3.0.0-SIGNED.apk"
           AAB_SOURCE="app/build/outputs/bundle/release/app-release.aab"
-          AAB_SIGNED="app/build/outputs/bundle/release/COLORJET-Management-Suite-v2.1.0-SIGNED.aab"
-          test -f "$APK_UNSIGNED"
+          AAB_SIGNED="app/build/outputs/bundle/release/COLORJET-Management-Suite-v3.0.0-SIGNED.aab"
+          test -n "$APK_SOURCE"\n          test -f "$APK_SOURCE"
           test -f "$AAB_SOURCE"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
           test -x "$APKSIGNER"
@@ -106,7 +106,7 @@ jobs:
             --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
             --key-pass env:ANDROID_KEY_PASSWORD \
             --out "$APK_SIGNED" \
-            "$APK_UNSIGNED"
+            "$APK_SOURCE"
           "$APKSIGNER" verify --verbose --print-certs "$APK_SIGNED"
           cp "$AAB_SOURCE" "$AAB_SIGNED"
           jarsigner \
@@ -120,13 +120,13 @@ jobs:
         working-directory: artifacts/mobile/android
         run: |
           mkdir -p release-package
-          cp app/build/outputs/apk/release/COLORJET-Management-Suite-v2.1.0-SIGNED.apk release-package/
-          cp app/build/outputs/bundle/release/COLORJET-Management-Suite-v2.1.0-SIGNED.aab release-package/
+          cp app/build/outputs/apk/release/COLORJET-Management-Suite-v3.0.0-SIGNED.apk release-package/
+          cp app/build/outputs/bundle/release/COLORJET-Management-Suite-v3.0.0-SIGNED.aab release-package/
           cat > release-package/BUILD_INFO.txt <<'EOF'
           COLORJET Management Suite
           Package: com.colorjetbd.managementsuite
-          Version: 2.1.0
-          Version Code: 3
+          Version: 3.0.0
+          Version Code: 3001
           Build type: Standalone React Native Android application
           WebView: Not used
           Original assets: Preserved from artifacts/mobile
@@ -136,7 +136,7 @@ jobs:
       - name: Upload Android release package
         uses: actions/upload-artifact@v4
         with:
-          name: COLORJET-MANAGEMENT-SUITE-ORIGINAL-V2.1-APK-AAB
+          name: COLORJET-MANAGEMENT-SUITE-V3.0-APK-AAB
           path: artifacts/mobile/android/release-package/*
           if-no-files-found: error
           retention-days: 30
