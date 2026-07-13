@@ -7,7 +7,9 @@
     "dev": "EXPO_PUBLIC_BASE_PATH=/ npx expo start --web --port 5000 --host 0.0.0.0",
     "build": "node scripts/build.js",
     "serve": "node server/serve.js",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "test:form-routes": "node scripts/test-form-routes.mjs",
+    "test": "npm run test:form-routes"
   },
   "dependencies": {
     "@babel/runtime": "^8.0.0",
