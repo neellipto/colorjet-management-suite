@@ -65,8 +65,18 @@ jobs:
       - name: Build debug and release outputs
         working-directory: artifacts/mobile/android
         run: |
+          set -o pipefail
           chmod +x gradlew
-          ./gradlew :app:assembleDebug :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace
+          ./gradlew :app:assembleDebug :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace 2>&1 | tee ../gradle-build.log
+
+      - name: Upload Gradle diagnostic log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: managementsuite-gradle-diagnostic
+          path: artifacts/mobile/gradle-build.log
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Prepare production keystore
         env:
