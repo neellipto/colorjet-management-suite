@@ -54,6 +54,7 @@ export default function MoreScreen() {
   const isMarketing = role === 'marketing' || role === 'sales';
   const isEngineer = role === 'engineer';
   const isStore = role === 'store';
+  const isCustomer = role === 'customer';
   const isServiceControl = role === 'service_control';
 
   const lowStockCount = products.filter(p => p.currentStock < p.minStockQty).length;
@@ -61,6 +62,8 @@ export default function MoreScreen() {
 
   const pb = insets.bottom + (Platform.OS === 'web' ? 34 : 0) + 70;
   const pt = Platform.OS === 'web' ? 67 : 0;
+
+  const openModule = (moduleId: string) => router.push(`/operations/${moduleId}` as any);
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -75,7 +78,6 @@ export default function MoreScreen() {
       contentContainerStyle={{ paddingTop: pt + 16, paddingBottom: pb, paddingHorizontal: 16, gap: 8 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* User Card */}
       <View style={[styles.userCard, { backgroundColor: colors.primary }]}>
         <View style={[styles.userAvatar, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
           <Feather name="user" size={24} color="#fff" />
@@ -83,13 +85,24 @@ export default function MoreScreen() {
         <View style={styles.userInfo}>
           <Text style={styles.userName}>{currentUser?.name}</Text>
           <Text style={styles.userRole}>{role.charAt(0).toUpperCase() + role.slice(1)} · COLORJET Bangladesh</Text>
-          {currentUser?.employeeCode ? (
-            <Text style={styles.userCode}>{currentUser.employeeCode}</Text>
-          ) : null}
+          {currentUser?.employeeCode ? <Text style={styles.userCode}>{currentUser.employeeCode}</Text> : null}
         </View>
       </View>
 
-      {/* Admin Control Center */}
+      {!isCustomer && (
+        <>
+          <SectionLabel label="ATTENDANCE & FIELD DUTY" />
+          <MenuItem
+            icon="navigation"
+            label="Attendance & Duty Route"
+            subtitle="Check-in, background location and route history"
+            onPress={() => router.push('/attendance' as any)}
+            iconBg="#E8EAF6"
+            iconColor="#1A237E"
+          />
+        </>
+      )}
+
       {isAdmin && (
         <>
           <SectionLabel label="ADMIN CONTROL CENTER" />
@@ -100,37 +113,42 @@ export default function MoreScreen() {
           <MenuItem icon="tool" label="Engineer Management" subtitle="Skills, KPIs, permissions" onPress={() => router.push('/admin/engineers' as any)} iconBg="#FFF8E1" iconColor="#F57F17" />
           <MenuItem icon="link" label="Integrations" subtitle="Odoo and messaging channels" onPress={() => router.push('/admin/integrations' as any)} iconBg="#F3E5F5" iconColor="#7B1FA2" />
           <MenuItem icon="sliders" label="Notification Settings" subtitle="Alerts and channels" onPress={() => router.push('/admin/notifications' as any)} iconBg="#FFEBEE" iconColor="#C62828" />
+          <MenuItem icon="cpu" label="Biometric Connectors" subtitle="Attendance device and sync configuration" onPress={() => openModule('biometric')} iconBg="#FFF3E0" iconColor="#EF6C00" />
         </>
       )}
 
-      {/* Service Operations */}
-      {(isAdmin || isServiceControl) && (
+      {(isAdmin || isServiceControl || isEngineer || isStore) && (
         <>
-          <SectionLabel label="SERVICE OPERATIONS" />
-          <MenuItem icon="activity" label="Service Control" subtitle="Live ticket dashboard" onPress={() => router.push('/service-control' as any)} iconBg={colors.navyLight} iconColor={colors.primary} />
-          <MenuItem icon="calendar" label="Engineer Schedule" subtitle="Plan and track visits" onPress={() => router.push('/schedule' as any)} iconBg="#E8F5E9" iconColor="#2E7D32" />
+          <SectionLabel label="SERVICE & WARRANTY OPERATIONS" />
+          {(isAdmin || isServiceControl) && <MenuItem icon="activity" label="Service Control" subtitle="Live ticket dashboard" onPress={() => router.push('/service-control' as any)} iconBg={colors.navyLight} iconColor={colors.primary} />}
+          {(isAdmin || isServiceControl) && <MenuItem icon="calendar" label="Engineer Schedule" subtitle="Plan and track visits" onPress={() => router.push('/schedule' as any)} iconBg="#E8F5E9" iconColor="#2E7D32" />}
+          <MenuItem icon="shield" label="Warranty Registration" subtitle="Machine warranty and claim tracking" onPress={() => openModule('warranty')} iconBg="#E8F5E9" iconColor="#2E7D32" />
+          <MenuItem icon="package" label="Spare Parts Logistics" subtitle="Request, approval, dispatch and delivery" onPress={() => openModule('spare-parts-logistics')} iconBg={colors.orangeLight} iconColor={colors.secondary} />
         </>
       )}
 
-      {/* Management Section */}
+      {(isAdmin || isAccounts || isMarketing) && (
+        <>
+          <SectionLabel label="PURCHASE, IMPORT & COMMERCIAL" />
+          <MenuItem icon="briefcase" label="Suppliers & Purchase" subtitle="Supplier, PI/PO and purchase payment" onPress={() => openModule('suppliers')} iconBg="#E3F2FD" iconColor="#1565C0" />
+          <MenuItem icon="truck" label="LC / TT & Shipment" subtitle="Foreign payment, shipment and trucking" onPress={() => openModule('lc-tt-shipment')} iconBg="#F3E5F5" iconColor="#7B1FA2" />
+          {(isAdmin || isAccounts) && <MenuItem icon="calculator" label="Landed Cost" subtitle="Duty, freight and unit landed cost" onPress={() => openModule('landed-cost')} iconBg="#FFEBEE" iconColor="#C62828" />}
+          {(isAdmin || isAccounts) && <MenuItem icon="book-open" label="Supplier Ledger" subtitle="Purchase, payment and running balance" onPress={() => openModule('supplier-ledger')} iconBg="#ECEFF1" iconColor="#455A64" />}
+        </>
+      )}
+
       {(isAdmin || isAccounts) && (
         <>
-          <SectionLabel label="MANAGEMENT" />
+          <SectionLabel label="MANAGEMENT & FINANCE" />
           <MenuItem icon="bar-chart-2" label="Reports Center" subtitle="Sales, due, expenses, P&L" onPress={() => router.push('/reports' as any)} iconBg="#E3F2FD" iconColor="#1565C0" />
           <MenuItem icon="truck" label="Deliveries" subtitle="Track all delivery orders" onPress={() => router.push('/delivery' as any)} iconBg={colors.orangeLight} iconColor={colors.secondary} />
+          <MenuItem icon="file-text" label="Sales Agreements" subtitle="Machine agreement, payment and EMI" onPress={() => openModule('agreements')} iconBg="#E0F2F1" iconColor="#00695C" />
+          <MenuItem icon="credit-card" label="Expenses" subtitle="Track and record expenses" onPress={() => router.push('/expenses' as any)} iconBg="#FFEBEE" iconColor="#C62828" />
+          <MenuItem icon="calendar" label="Leave, Payroll & Holiday" subtitle="Leave approval and salary workflow" onPress={() => openModule('leave-payroll')} iconBg="#FCE4EC" iconColor="#AD1457" />
           {isAdmin && <MenuItem icon="users" label="Customers" subtitle="Manage customer accounts" onPress={() => router.push('/(tabs)/sales' as any)} iconBg="#E8F5E9" iconColor="#2E7D32" />}
         </>
       )}
 
-      {/* Accounts Section */}
-      {(isAdmin || isAccounts) && (
-        <>
-          <SectionLabel label="FINANCE" />
-          <MenuItem icon="credit-card" label="Expenses" subtitle="Track and record expenses" onPress={() => router.push('/expenses' as any)} iconBg="#FFEBEE" iconColor="#C62828" />
-        </>
-      )}
-
-      {/* Service Section */}
       {(isAdmin || isEngineer) && (
         <>
           <SectionLabel label="OPERATIONS" />
@@ -138,7 +156,6 @@ export default function MoreScreen() {
         </>
       )}
 
-      {/* Marketing Section */}
       {isMarketing && (
         <>
           <SectionLabel label="MY TOOLS" />
@@ -147,7 +164,6 @@ export default function MoreScreen() {
         </>
       )}
 
-      {/* Store Section */}
       {isStore && (
         <>
           <SectionLabel label="STORE TOOLS" />
@@ -163,7 +179,6 @@ export default function MoreScreen() {
         </>
       )}
 
-      {/* Notifications */}
       <SectionLabel label="NOTIFICATIONS" />
       <MenuItem
         icon="bell"
@@ -175,11 +190,9 @@ export default function MoreScreen() {
         iconColor="#F57F17"
       />
 
-      {/* Account */}
       <SectionLabel label="ACCOUNT" />
       <MenuItem icon="user" label="My Profile" subtitle="View and edit profile" onPress={() => router.push('/profile' as any)} />
 
-      {/* Sign Out */}
       <TouchableOpacity
         style={[styles.logoutBtn, { backgroundColor: '#FFEBEE', borderColor: '#FFCDD2' }]}
         onPress={handleLogout}
@@ -189,7 +202,7 @@ export default function MoreScreen() {
         <Text style={[styles.logoutText, { color: '#C62828' }]}>Sign Out</Text>
       </TouchableOpacity>
 
-      <Text style={[styles.version, { color: colors.mutedForeground }]}>COLORJET ERP v2.0 · Bangladesh</Text>
+      <Text style={[styles.version, { color: colors.mutedForeground }]}>COLORJET Management Suite v2.1 · Bangladesh</Text>
     </ScrollView>
   );
 }
