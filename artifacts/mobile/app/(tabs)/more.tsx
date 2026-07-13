@@ -132,7 +132,7 @@ export default function MoreScreen() {
           <SectionLabel label="PURCHASE, IMPORT & COMMERCIAL" />
           <MenuItem icon="briefcase" label="Suppliers & Purchase" subtitle="Supplier, PI/PO and purchase payment" onPress={() => openModule('suppliers')} iconBg="#E3F2FD" iconColor="#1565C0" />
           <MenuItem icon="truck" label="LC / TT & Shipment" subtitle="Foreign payment, shipment and trucking" onPress={() => openModule('lc-tt-shipment')} iconBg="#F3E5F5" iconColor="#7B1FA2" />
-          {(isAdmin || isAccounts) && <MenuItem icon="calculator" label="Landed Cost" subtitle="Duty, freight and unit landed cost" onPress={() => openModule('landed-cost')} iconBg="#FFEBEE" iconColor="#C62828" />}
+          {(isAdmin || isAccounts) && <MenuItem icon="pie-chart" label="Landed Cost" subtitle="Duty, freight and unit landed cost" onPress={() => openModule('landed-cost')} iconBg="#FFEBEE" iconColor="#C62828" />}
           {(isAdmin || isAccounts) && <MenuItem icon="book-open" label="Supplier Ledger" subtitle="Purchase, payment and running balance" onPress={() => openModule('supplier-ledger')} iconBg="#ECEFF1" iconColor="#455A64" />}
         </>
       )}
