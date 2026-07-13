@@ -6,6 +6,11 @@ on:
     paths:
       - 'build-source-v17/**'
       - '.github/workflows/build-managementsuite-v17.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'build-source-v17/**'
+      - '.github/workflows/build-managementsuite-v17.yml'
   workflow_dispatch:
 
 permissions:
