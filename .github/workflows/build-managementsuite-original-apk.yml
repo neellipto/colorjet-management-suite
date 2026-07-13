@@ -56,6 +56,9 @@ jobs:
       - name: TypeScript validation
         run: pnpm --filter @workspace/mobile run typecheck
 
+      - name: Form route regression test
+        run: pnpm --filter @workspace/mobile run test:form-routes
+
       - name: Generate standalone Android project
         working-directory: artifacts/mobile
         env:
