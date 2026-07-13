@@ -1,0 +1,13 @@
+COLORJET Management Suite V3.1 merged Android build trigger.
+
+All verified source chunks are present:
+- source.part.00 through source.part.05
+- source.part.060 through source.part.062
+- source.part.070 through source.part.072
+- source.part.080 through source.part.082
+- source.part.090 through source.part.091
+
+Expected reconstructed source archive SHA-256:
+06af5f6ca339af0620a88cd466ba87d4ef38baebd40ec601eb96605c79bee4cd
+
+This trigger was committed after completion of every source chunk.
