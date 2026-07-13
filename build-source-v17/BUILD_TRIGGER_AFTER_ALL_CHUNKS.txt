@@ -1,0 +1,23 @@
+Final build trigger committed after every verified source continuation file was uploaded.
+
+Expected source archive SHA-256:
+06af5f6ca339af0620a88cd466ba87d4ef38baebd40ec601eb96605c79bee4cd
+
+Required ordered chunks:
+source.part.00
+source.part.01
+source.part.02
+source.part.03
+source.part.04
+source.part.05
+source.part.060
+source.part.061
+source.part.062
+source.part.070
+source.part.071
+source.part.072
+source.part.080
+source.part.081
+source.part.082
+source.part.090
+source.part.091
