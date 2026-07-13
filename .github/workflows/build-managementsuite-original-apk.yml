@@ -62,12 +62,12 @@ jobs:
           CI: '1'
         run: pnpm exec expo prebuild --platform android --clean --no-install
 
-      - name: Build debug and release outputs
+      - name: Build release APK and AAB
         working-directory: artifacts/mobile/android
         run: |
           set -o pipefail
           chmod +x gradlew
-          ./gradlew :app:assembleDebug :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace 2>&1 | tee ../gradle-build.log
+          ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace 2>&1 | tee ../gradle-build.log
 
       - name: Upload Gradle diagnostic log
         if: failure()
@@ -120,7 +120,6 @@ jobs:
         working-directory: artifacts/mobile/android
         run: |
           mkdir -p release-package
-          cp app/build/outputs/apk/debug/app-debug.apk release-package/COLORJET-Management-Suite-v2.1.0-DEBUG.apk
           cp app/build/outputs/apk/release/COLORJET-Management-Suite-v2.1.0-SIGNED.apk release-package/
           cp app/build/outputs/bundle/release/COLORJET-Management-Suite-v2.1.0-SIGNED.aab release-package/
           cat > release-package/BUILD_INFO.txt <<'EOF'
