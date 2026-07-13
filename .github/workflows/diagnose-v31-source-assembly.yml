@@ -1,0 +1,57 @@
+name: Diagnose V3.1 Source Assembly
+
+on:
+  push:
+    branches: [managementsuite-v17-merged-build]
+    paths:
+      - 'build-source-v17/**'
+      - '.github/workflows/diagnose-v31-source-assembly.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'build-source-v17/**'
+      - '.github/workflows/diagnose-v31-source-assembly.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble diagnostic files
+        run: |
+          mkdir -p diagnostic
+          cat \
+            build-source-v17/source.part.00 \
+            build-source-v17/source.part.01 \
+            build-source-v17/source.part.02 \
+            build-source-v17/source.part.03 \
+            build-source-v17/source.part.04 \
+            build-source-v17/source.part.05 \
+            build-source-v17/source.part.060 \
+            build-source-v17/source.part.061 \
+            build-source-v17/source.part.062 \
+            build-source-v17/source.part.070 \
+            build-source-v17/source.part.071 \
+            build-source-v17/source.part.072 \
+            build-source-v17/source.part.080 \
+            build-source-v17/source.part.081 \
+            build-source-v17/source.part.082 \
+            build-source-v17/source.part.090 \
+            build-source-v17/source.part.091 \
+            > diagnostic/assembled-source.base64
+          base64 --decode diagnostic/assembled-source.base64 > diagnostic/assembled-source.tar.gz 2> diagnostic/base64-error.txt || true
+          sha256sum diagnostic/assembled-source.base64 diagnostic/assembled-source.tar.gz > diagnostic/SHA256SUMS.txt
+          wc -c build-source-v17/source.part.* diagnostic/assembled-source.base64 diagnostic/assembled-source.tar.gz > diagnostic/SIZES.txt
+          gzip -t diagnostic/assembled-source.tar.gz > diagnostic/GZIP_TEST.txt 2>&1 || true
+          tar -tzf diagnostic/assembled-source.tar.gz > diagnostic/TAR_LIST.txt 2> diagnostic/TAR_ERROR.txt || true
+          ls -la build-source-v17/source.part.* > diagnostic/PARTS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: COLORJET-V31-SOURCE-ASSEMBLY-DIAGNOSTIC
+          path: diagnostic/*
+          if-no-files-found: error
+          retention-days: 7
