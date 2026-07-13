@@ -1,4 +1,4 @@
-name: Build COLORJET Management Suite Original APK
+name: Build COLORJET Management Suite Hosting APK
 
 on:
   pull_request:
@@ -17,10 +17,14 @@ permissions:
 
 jobs:
   build-android:
-    name: Build standalone APK and AAB
+    name: Build hosting-connected signed APK and AAB
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
+      EXPO_PUBLIC_ERP_API_BASE_URL: https://erp.colorjetbd.com/api/v1
+      EXPO_PUBLIC_AUTH_REDIRECT_URL: https://erp.colorjetbd.com/mobile/auth/callback
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.COLORJET_ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_ALIAS: ${{ secrets.COLORJET_ANDROID_KEY_ALIAS }}
       ANDROID_KEY_PASSWORD: ${{ secrets.COLORJET_ANDROID_KEY_PASSWORD }}
@@ -59,6 +63,13 @@ jobs:
       - name: Form route regression test
         run: pnpm --filter @workspace/mobile run test:form-routes
 
+      - name: Verify embedded hosting configuration
+        run: |
+          test "$EXPO_PUBLIC_ERP_API_BASE_URL" = "https://erp.colorjetbd.com/api/v1"
+          grep -q 'com.colorjetbd.managementsuite' artifacts/mobile/app.json
+          grep -q '"version": "3.0.1"' artifacts/mobile/app.json
+          grep -q '"versionCode": 3002' artifacts/mobile/app.json
+
       - name: Generate standalone Android project
         working-directory: artifacts/mobile
         env:
@@ -76,7 +87,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: managementsuite-gradle-diagnostic
+          name: managementsuite-hosting-gradle-diagnostic
           path: artifacts/mobile/gradle-build.log
           if-no-files-found: warn
           retention-days: 7
@@ -96,9 +107,9 @@ jobs:
         run: |
           set -euo pipefail
           APK_SOURCE="$(find app/build/outputs/apk/release -maxdepth 1 -type f \( -name 'app-release-unsigned.apk' -o -name 'app-release.apk' \) | head -1)"
-          APK_SIGNED="app/build/outputs/apk/release/COLORJET-Management-Suite-v3.0.0-SIGNED.apk"
+          APK_SIGNED="app/build/outputs/apk/release/COLORJET-Management-Suite-v3.0.1-HOSTING-SIGNED.apk"
           AAB_SOURCE="app/build/outputs/bundle/release/app-release.aab"
-          AAB_SIGNED="app/build/outputs/bundle/release/COLORJET-Management-Suite-v3.0.0-SIGNED.aab"
+          AAB_SIGNED="app/build/outputs/bundle/release/COLORJET-Management-Suite-v3.0.1-HOSTING-SIGNED.aab"
           test -n "$APK_SOURCE"
           test -f "$APK_SOURCE"
           test -f "$AAB_SOURCE"
@@ -124,15 +135,18 @@ jobs:
         working-directory: artifacts/mobile/android
         run: |
           mkdir -p release-package
-          cp app/build/outputs/apk/release/COLORJET-Management-Suite-v3.0.0-SIGNED.apk release-package/
-          cp app/build/outputs/bundle/release/COLORJET-Management-Suite-v3.0.0-SIGNED.aab release-package/
+          cp app/build/outputs/apk/release/COLORJET-Management-Suite-v3.0.1-HOSTING-SIGNED.apk release-package/
+          cp app/build/outputs/bundle/release/COLORJET-Management-Suite-v3.0.1-HOSTING-SIGNED.aab release-package/
           cat > release-package/BUILD_INFO.txt <<'EOF'
           COLORJET Management Suite
           Package: com.colorjetbd.managementsuite
-          Version: 3.0.0
-          Version Code: 3001
+          Version: 3.0.1
+          Version Code: 3002
           Build type: Standalone React Native Android application
           WebView: Not used
+          Hosting API: https://erp.colorjetbd.com/api/v1
+          Offline cache: Enabled for operational forms
+          Authentication: Existing Supabase session JWT forwarded to hosting API
           Original assets: Preserved from artifacts/mobile
           EOF
           (cd release-package && sha256sum * > SHA256SUMS.txt)
@@ -140,7 +154,7 @@ jobs:
       - name: Upload Android release package
         uses: actions/upload-artifact@v4
         with:
-          name: COLORJET-MANAGEMENT-SUITE-V3.0-APK-AAB
+          name: COLORJET-MANAGEMENT-SUITE-V3.0.1-HOSTING-APK-AAB
           path: artifacts/mobile/android/release-package/*
           if-no-files-found: error
           retention-days: 30
