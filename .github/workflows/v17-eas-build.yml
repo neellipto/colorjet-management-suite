@@ -72,6 +72,10 @@ jobs:
         with:
           node-version: '22.16.0'
 
+      - name: Correct Expo asset extension without changing original image
+        working-directory: work
+        run: node ../repo/v17-build/fix-expo-icon-extension.mjs
+
       - name: Install Expo dependencies with Yarn
         working-directory: work
         shell: bash
