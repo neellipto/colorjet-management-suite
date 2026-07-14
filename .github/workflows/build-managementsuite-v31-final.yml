@@ -52,9 +52,11 @@ jobs:
           echo "${SOURCE_SHA256}  $RUNNER_TEMP/COLORJET_V311_MERGED_SOURCE.tar.gz" | sha256sum --check
           gzip --test "$RUNNER_TEMP/COLORJET_V311_MERGED_SOURCE.tar.gz"
           tar -xzf "$RUNNER_TEMP/COLORJET_V311_MERGED_SOURCE.tar.gz" -C build/mobile
+          cp -a build-source-v311/patches/. build/mobile/
           test -f build/mobile/package.json
           test -f build/mobile/app.json
           test -f build/mobile/src/core/moduleRegistry.ts
+          test -f build/mobile/app/new/[key].tsx
           cp "$RUNNER_TEMP/COLORJET_V311_MERGED_SOURCE.tar.gz" build/output/
 
       - name: Verify app identity and protected icon path
