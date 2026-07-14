@@ -1,0 +1,36 @@
+name: V17 EAS Auth Check
+
+on:
+  push:
+    branches:
+      - build/v17-eas-20260714
+  workflow_dispatch:
+
+jobs:
+  check-eas-auth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Check Expo token availability
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "EXPO_TOKEN_MISSING"
+            exit 2
+          fi
+          echo "EXPO_TOKEN_PRESENT"
+
+      - name: Verify Expo account
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: npx --yes eas-cli@21.0.0 whoami
