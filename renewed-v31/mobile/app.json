@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "COLORJET Management Suite",
+    "slug": "colorjet-management-suite",
+    "version": "3.1.0",
+    "scheme": "colorjetmanagement",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "web": {"bundler": "metro", "output": "static"},
+    "plugins": [
+      "expo-router",
+      ["expo-location", {"locationWhenInUsePermission": "COLORJET Management Suite uses your precise location for attendance and assigned customer visits.", "locationAlwaysAndWhenInUsePermission": "Background location is recorded only while an active duty or customer-visit session is running.", "isAndroidBackgroundLocationEnabled": true}],
+      ["expo-notifications", {"defaultChannel": "colorjet-operations"}]
+    ],
+    "experiments": {"typedRoutes": false},
+    "icon": "./assets/images/colorjet-original-icon.png",
+    "android": {
+      "package": "com.colorjetbd.managementsuite",
+      "versionCode": 3100,
+      "adaptiveIcon": {"foregroundImage": "./assets/images/colorjet-original-icon.png", "backgroundColor": "#FFFFFF"},
+      "permissions": ["ACCESS_BACKGROUND_LOCATION","ACCESS_COARSE_LOCATION","ACCESS_FINE_LOCATION","CAMERA","FOREGROUND_SERVICE","FOREGROUND_SERVICE_LOCATION","INTERNET","POST_NOTIFICATIONS","RECEIVE_BOOT_COMPLETED"],
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "newArchEnabled": true,
+    "splash": {"image": "./assets/images/colorjet-original-icon.png", "resizeMode": "contain", "backgroundColor": "#FFFFFF"}
+  }
+}

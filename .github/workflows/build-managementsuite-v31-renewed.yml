@@ -1,0 +1,78 @@
+name: Build COLORJET Management Suite V3.1 Renewed
+
+on:
+  push:
+    branches: [managementsuite-v31-renewed-20260714]
+    paths:
+      - 'renewed-v31/**'
+      - '.github/workflows/build-managementsuite-v31-renewed.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - uses: android-actions/setup-android@v3
+      - name: Prepare original COLORJET asset
+        run: |
+          mkdir -p renewed-v31/mobile/assets/images
+          cp artifacts/mobile/assets/images/icon.png renewed-v31/mobile/assets/images/colorjet-original-icon.png
+      - name: Install and validate
+        working-directory: renewed-v31/mobile
+        run: |
+          npm install --no-audit --no-fund
+          npm run typecheck
+          CI=1 npx expo install --check
+          CI=1 npx expo prebuild --platform android --clean --no-install
+      - name: Compile APK and AAB
+        working-directory: renewed-v31/mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace
+      - name: Package release
+        working-directory: renewed-v31/mobile
+        run: |
+          mkdir -p release-package
+          cp android/app/build/outputs/apk/release/app-release.apk release-package/COLORJET-Management-Suite-v3.1.0-RENEWED.apk
+          cp android/app/build/outputs/bundle/release/app-release.aab release-package/COLORJET-Management-Suite-v3.1.0-RENEWED.aab
+          zip -qr release-package/COLORJET-MANAGEMENT-SUITE-V3.1-RENEWED-SOURCE.zip . -x 'node_modules/*' 'android/*' '.expo/*' 'release-package/*'
+          cat > release-package/BUILD_INFO.txt <<EOF
+          COLORJET Management Suite V3.1 Renewed
+          Package: com.colorjetbd.managementsuite
+          Version: 3.1.0
+          Version Code: 3100
+          Build: Fresh standalone React Native / Expo Android
+          Source: V3 cPanel API/security base with V16 module inventory
+          Module registry: 53 modules
+          Secure runtime cPanel URL: Enabled
+          SecureStore session: Enabled
+          GPS attendance/background route: Enabled
+          WebView: Not used
+          Old V15 APK reused: No
+          TypeScript: Passed
+          Expo prebuild: Fresh
+          Gradle APK/AAB: Passed
+          Signing: Expo generated release configuration
+          Runtime cPanel login: Requires compatible live backend
+          Physical-device test: Not performed in CI
+          EOF
+          (cd release-package && sha256sum COLORJET-* BUILD_INFO.txt > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: COLORJET-MANAGEMENT-SUITE-V3.1-RENEWED-APK-AAB-SOURCE
+          path: renewed-v31/mobile/release-package/*
+          if-no-files-found: error
+          retention-days: 30
