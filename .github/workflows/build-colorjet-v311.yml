@@ -1,0 +1,127 @@
+name: Build COLORJET Management Suite V3.1.1
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [managementsuite-v17-merged-build]
+    paths:
+      - 'build-source-v311/**'
+      - '.github/workflows/build-colorjet-v311.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SOURCE_SHA256: cfd613ebc6d368ab10435d88f589473ce4702af637c87e19ccf5a679bdfa5ba3
+      EXPECTED_PACKAGE: com.colorjetbd.managementsuite
+      EXPECTED_VERSION: 3.1.1
+      EXPECTED_VERSION_CODE: '3101'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct and verify source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build-work/app-source build-output
+          cat \
+            build-source-v311/source.part.00 \
+            build-source-v311/source.part.01 \
+            build-source-v311/source.part.02 \
+            build-source-v311/source.part.03 \
+            build-source-v311/source.part.04 \
+            > build-work/source.base64
+          base64 --decode build-work/source.base64 > build-work/COLORJET_V311_MERGED_SOURCE.tar.gz
+          echo "${SOURCE_SHA256}  build-work/COLORJET_V311_MERGED_SOURCE.tar.gz" | sha256sum --check
+          gzip --test build-work/COLORJET_V311_MERGED_SOURCE.tar.gz
+          tar -xzf build-work/COLORJET_V311_MERGED_SOURCE.tar.gz -C build-work/app-source
+          test -f build-work/app-source/package.json
+          test -f build-work/app-source/app.json
+
+      - name: Verify production identity
+        working-directory: build-work/app-source
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const app = JSON.parse(fs.readFileSync('app.json', 'utf8')).expo;
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const expected = {
+            name: process.env.EXPECTED_PACKAGE,
+            version: process.env.EXPECTED_VERSION,
+            code: Number(process.env.EXPECTED_VERSION_CODE),
+          };
+          if (app.android.package !== expected.name) throw new Error(`Package mismatch: ${app.android.package}`);
+          if (app.version !== expected.version || pkg.version !== expected.version) throw new Error('Version mismatch');
+          if (app.android.versionCode !== expected.code) throw new Error(`versionCode mismatch: ${app.android.versionCode}`);
+          if (app.icon !== './assets/images/colorjet-original-icon.webp') throw new Error('Original COLORJET icon path changed');
+          console.log(JSON.stringify({appName: app.name, package: app.android.package, version: app.version, versionCode: app.android.versionCode, icon: app.icon}, null, 2));
+          NODE
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: build-work/app-source/package.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        working-directory: build-work/app-source
+        run: npm install --no-audit --no-fund
+
+      - name: Verify dependency compatibility
+        working-directory: build-work/app-source
+        run: npx expo install --check
+
+      - name: TypeScript and source verification
+        working-directory: build-work/app-source
+        run: npm run verify
+
+      - name: Generate fresh native Android project
+        working-directory: build-work/app-source
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Compile unsigned release APK
+        working-directory: build-work/app-source/android
+        shell: bash
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --stacktrace --no-daemon | tee ../../gradle-build.log
+
+      - name: Verify compiled APK identity
+        working-directory: build-work/app-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find android/app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)"
+          test -n "$APK"
+          ACTUAL_PACKAGE="$(apkanalyzer manifest application-id "$APK")"
+          ACTUAL_CODE="$(apkanalyzer manifest version-code "$APK")"
+          test "$ACTUAL_PACKAGE" = "$EXPECTED_PACKAGE"
+          test "$ACTUAL_CODE" = "$EXPECTED_VERSION_CODE"
+          cp "$APK" ../../build-output/COLORJET-Management-Suite-V3.1.1-UNSIGNED.apk
+          cp ../COLORJET_V311_MERGED_SOURCE.tar.gz ../../build-output/ 2>/dev/null || cp ../source.base64 ../../build-output/source.base64
+          (cd ../../build-output && sha256sum * > SHA256SUMS.txt)
+          apkanalyzer manifest print "$APK" > ../../build-output/ANDROID_MANIFEST.txt
+
+      - name: Upload compiler output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: COLORJET-Management-Suite-V3.1.1-Compiler-Output
+          path: |
+            build-output/**
+            build-work/gradle-build.log
+            build-work/app-source/gradle-build.log
+          if-no-files-found: warn
+          retention-days: 14
