@@ -72,6 +72,24 @@ jobs:
         with:
           node-version: '22.16.0'
 
+      - name: Install Expo dependencies with Yarn
+        working-directory: work
+        run: |
+          yarn --version
+          yarn install --ignore-scripts --non-interactive --no-progress --network-timeout 600000
+          test -f node_modules/expo-router/package.json
+          test -f node_modules/expo/package.json
+          test -f node_modules/expo-splash-screen/package.json
+          test -f node_modules/expo-location/package.json
+          test -f node_modules/expo-secure-store/package.json
+          rm -f package-lock.json
+          node <<'NODE'
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          pkg.packageManager = 'yarn@1.22.22';
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          NODE
+
       - name: Configure Expo and original signing key
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.COLORJET_ANDROID_KEYSTORE_BASE64 }}
