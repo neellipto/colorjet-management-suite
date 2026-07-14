@@ -16,25 +16,28 @@ jobs:
   verify:
     name: Verify V17 source
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: v17-build/work
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          show-progress: false
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Extract V17 source
-        working-directory: .
         run: |
           rm -rf v17-build/work
           mkdir -p v17-build/work
+          gzip -t v17-build/v17-eas-source.tar.gz
           tar -xzf v17-build/v17-eas-source.tar.gz -C v17-build/work
+          test -f v17-build/work/package.json
+          test -f v17-build/work/app.json
       - name: Install dependencies
+        working-directory: v17-build/work
         run: npm install
       - name: Verify source
+        working-directory: v17-build/work
         run: npm run verify
 
   eas-build:
@@ -53,29 +56,32 @@ jobs:
             filename: COLORJET_MANAGEMENT_SUITE_V17_0_SIGNED.aab
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-    defaults:
-      run:
-        working-directory: v17-build/work
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          show-progress: false
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Extract V17 source
-        working-directory: .
         run: |
           rm -rf v17-build/work
           mkdir -p v17-build/work
+          gzip -t v17-build/v17-eas-source.tar.gz
           tar -xzf v17-build/v17-eas-source.tar.gz -C v17-build/work
       - name: Install dependencies
+        working-directory: v17-build/work
         run: npm install
       - name: Link existing Expo project
+        working-directory: v17-build/work
         run: npx --yes eas-cli@latest project:init --force --non-interactive
       - name: Queue and wait for signed Android build
+        working-directory: v17-build/work
         run: npx --yes eas-cli@latest build --platform android --profile "${{ matrix.profile }}" --non-interactive --wait --json > "eas-${{ matrix.profile }}.json"
       - name: Download signed output
+        working-directory: v17-build/work
         shell: bash
         run: |
           BUILD_URL=$(jq -r 'if type == "array" then .[0].artifacts.buildUrl else .artifacts.buildUrl end' "eas-${{ matrix.profile }}.json")
