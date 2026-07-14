@@ -24,10 +24,9 @@ jobs:
       - name: Clone authoritative V17 branch
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          git clone --quiet --depth 1 --branch "$V17_BRANCH" "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" repo
+        run: git clone --quiet --depth 1 --branch "$V17_BRANCH" "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" repo
 
-      - name: Extract uploaded V17 source
+      - name: Extract and verify V17 source
         run: |
           ls -lh "repo/$SOURCE_ZIP"
           unzip -t "repo/$SOURCE_ZIP" >/dev/null
@@ -37,10 +36,7 @@ jobs:
           test -f work/package-lock.json
           test -f work/app.json
           test -f work/eas.json
-
-      - name: Verify locked UI and module registry
-        working-directory: work
-        run: |
+          cd work
           node scripts/check-ui-lock.mjs
           node scripts/verify-no-legacy-host.mjs
           node scripts/verify-module-registry.mjs
@@ -69,8 +65,7 @@ jobs:
       - name: Clone authoritative V17 branch
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          git clone --quiet --depth 1 --branch "$V17_BRANCH" "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" repo
+        run: git clone --quiet --depth 1 --branch "$V17_BRANCH" "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" repo
 
       - name: Extract uploaded V17 source
         run: |
@@ -83,67 +78,18 @@ jobs:
         with:
           node-version: '22.16.0'
 
-      - name: Configure Expo project and original signing credentials
-        working-directory: work
-        shell: bash
-        run: |
-          test -n "$EXPO_TOKEN"
-          test -n "$ANDROID_KEYSTORE_BASE64"
-          test -n "$ANDROID_KEYSTORE_PASSWORD"
-          test -n "$ANDROID_KEY_ALIAS"
-          test -n "$ANDROID_KEY_PASSWORD"
-
-          node <<'NODE'
-          const fs = require('fs');
-          const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
-          app.expo.owner = 'neellipto';
-          fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
-
-          const eas = JSON.parse(fs.readFileSync('eas.json', 'utf8'));
-          eas.build.preview.credentialsSource = 'local';
-          eas.build.production.credentialsSource = 'local';
-          fs.writeFileSync('eas.json', JSON.stringify(eas, null, 2) + '\n');
-          NODE
-
-          mkdir -p credentials/android
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > credentials/android/colorjet-release.jks
-          keytool -list \
-            -keystore credentials/android/colorjet-release.jks \
-            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
-            -alias "$ANDROID_KEY_ALIAS" >/dev/null
-
-          node <<'NODE'
-          const fs = require('fs');
-          const credentials = {
-            android: {
-              keystore: {
-                keystorePath: 'credentials/android/colorjet-release.jks',
-                keystorePassword: process.env.ANDROID_KEYSTORE_PASSWORD,
-                keyAlias: process.env.ANDROID_KEY_ALIAS,
-                keyPassword: process.env.ANDROID_KEY_PASSWORD
-              }
-            }
-          };
-          fs.writeFileSync('credentials.json', JSON.stringify(credentials, null, 2) + '\n');
-          NODE
-
-          cat > .easignore <<'EOF'
-          node_modules/
-          .expo/
-          dist/
-          web-build/
-          .env
-          android/
-          ios/
-          .DS_Store
-          npm-debug.log*
-          .git/
-          .github/
-          EOF
+      - name: Configure Expo and original signing key
+        run: bash repo/v17-build/configure-eas-local-signing.sh work
 
       - name: Link or create the Expo project
-        working-directory: work
-        run: npx --yes eas-cli@latest project:init --force --non-interactive
+        shell: bash
+        run: |
+          set +e
+          cd work
+          npx --yes eas-cli@latest project:init --force --non-interactive > ../project-init.log 2>&1
+          STATUS=$?
+          tail -n 60 ../project-init.log
+          exit $STATUS
 
       - name: Queue and wait for signed Android build
         working-directory: work
