@@ -27,21 +27,17 @@ jobs:
       EXPECTED_VERSION_CODE: '3101'
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
         with:
           version: 9
-
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
-
       - uses: android-actions/setup-android@v3
 
       - name: Reconstruct exact verified V3.1.1 source
@@ -80,18 +76,33 @@ jobs:
           console.log(JSON.stringify({name: app.name, package: app.android.package, version: app.version, versionCode: app.android.versionCode, icon: app.icon}, null, 2));
           NODE
 
-      - name: Install and validate source
+      - name: Install dependencies
         working-directory: build/mobile
         shell: bash
         run: |
-          set -euo pipefail
-          pnpm install --no-frozen-lockfile
-          CI=1 pnpm exec expo install --check
-          pnpm run verify
+          set -o pipefail
+          pnpm install --no-frozen-lockfile 2>&1 | tee ../output/PNPM_INSTALL.log
+
+      - name: Verify Expo dependency compatibility
+        working-directory: build/mobile
+        shell: bash
+        run: |
+          set -o pipefail
+          CI=1 pnpm exec expo install --check 2>&1 | tee ../output/EXPO_DEPENDENCY_CHECK.log
+
+      - name: Verify TypeScript and source rules
+        working-directory: build/mobile
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm run verify 2>&1 | tee ../output/SOURCE_VERIFY.log
 
       - name: Generate fresh native Android project
         working-directory: build/mobile
-        run: CI=1 pnpm exec expo prebuild --platform android --clean --no-install
+        shell: bash
+        run: |
+          set -o pipefail
+          CI=1 pnpm exec expo prebuild --platform android --clean --no-install 2>&1 | tee ../output/EXPO_PREBUILD.log
 
       - name: Compile APK and AAB
         working-directory: build/mobile/android
@@ -99,7 +110,7 @@ jobs:
         run: |
           set -o pipefail
           chmod +x gradlew
-          ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace 2>&1 | tee ../gradle-build.log
+          ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace 2>&1 | tee ../../output/GRADLE_BUILD.log
 
       - name: Verify compiler outputs
         working-directory: build/mobile
@@ -116,7 +127,6 @@ jobs:
           test "$ACTUAL_CODE" = "$EXPECTED_VERSION_CODE"
           cp "$APK_SOURCE" ../output/COLORJET-Management-Suite-V3.1.1-COMPILER-TEST.apk
           cp "$AAB_SOURCE" ../output/COLORJET-Management-Suite-V3.1.1-COMPILER-TEST.aab
-          cp gradle-build.log ../output/GRADLE_BUILD.log
           apkanalyzer manifest print "$APK_SOURCE" > ../output/ANDROID_MANIFEST.txt
           cat > ../output/BUILD_INFO.txt <<'EOF'
           COLORJET Management Suite V3.1.1 — Compiler Test Build
@@ -135,22 +145,11 @@ jobs:
           EOF
           (cd ../output && sha256sum COLORJET-* COLORJET_V311_MERGED_SOURCE.tar.gz ANDROID_MANIFEST.txt BUILD_INFO.txt > SHA256SUMS.txt)
 
-      - name: Upload diagnostics on failure
-        if: failure()
+      - name: Upload build evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: COLORJET-V3.1.1-BUILD-DIAGNOSTICS
-          path: |
-            build/mobile/gradle-build.log
-            build/output/**
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload compiler test package
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: COLORJET-MANAGEMENT-SUITE-V3.1.1-COMPILER-TEST
+          name: COLORJET-MANAGEMENT-SUITE-V3.1.1-BUILD-EVIDENCE
           path: build/output/*
           if-no-files-found: error
           retention-days: 14
