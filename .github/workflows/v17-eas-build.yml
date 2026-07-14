@@ -142,6 +142,20 @@ jobs:
             exit "$STATUS"
           fi
 
+      - name: Upload EAS diagnostic logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: COLORJET-V17-${{ matrix.profile }}-EAS-DIAGNOSTICS
+          path: |
+            work/eas-${{ matrix.profile }}.json
+            work/eas-${{ matrix.profile }}.err
+            project-init.log
+            work/app.json
+            work/eas.json
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Download signed output
         working-directory: work
         shell: bash
