@@ -1,0 +1,4 @@
+COLORJET Management Suite V3.1.1 clean compiler build
+Package: com.colorjetbd.managementsuite
+Version code: 3101
+Source SHA256: cfd613ebc6d368ab10435d88f589473ce4702af637c87e19ccf5a679bdfa5ba3
