@@ -58,13 +58,17 @@ jobs:
       - name: Compile standalone bundled test APK
         run: ./gradlew assembleRelease --stacktrace
         working-directory: artifacts/mobile/android
-      - name: Generate checksum
-        run: sha256sum android/app/build/outputs/apk/release/app-release.apk > V13-standalone-checksums.sha256
+      - name: Rename APK and generate checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp android/app/build/outputs/apk/release/app-release.apk COLORJET_ERP_V13_Standalone_Test.apk
+          sha256sum COLORJET_ERP_V13_Standalone_Test.apk > COLORJET_ERP_V13_Standalone_Test.apk.sha256
       - uses: actions/upload-artifact@v4
         with:
           name: COLORJET-ERP-V13-Standalone-Test-APK
           path: |
-            artifacts/mobile/android/app/build/outputs/apk/debug/app-debug.apk
-            artifacts/mobile/V13-checksums.sha256
+            artifacts/mobile/COLORJET_ERP_V13_Standalone_Test.apk
+            artifacts/mobile/COLORJET_ERP_V13_Standalone_Test.apk.sha256
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
