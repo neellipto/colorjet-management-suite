@@ -55,12 +55,6 @@ jobs:
             filename: COLORJET_MANAGEMENT_SUITE_V17_0_SIGNED.apk
           - profile: production
             filename: COLORJET_MANAGEMENT_SUITE_V17_0_SIGNED.aab
-    env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-      ANDROID_KEYSTORE_BASE64: ${{ secrets.COLORJET_ANDROID_KEYSTORE_BASE64 }}
-      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.COLORJET_ANDROID_KEYSTORE_PASSWORD }}
-      ANDROID_KEY_ALIAS: ${{ secrets.COLORJET_ANDROID_KEY_ALIAS }}
-      ANDROID_KEY_PASSWORD: ${{ secrets.COLORJET_ANDROID_KEY_PASSWORD }}
     steps:
       - name: Clone authoritative V17 branch
         env:
@@ -79,9 +73,16 @@ jobs:
           node-version: '22.16.0'
 
       - name: Configure Expo and original signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.COLORJET_ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.COLORJET_ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.COLORJET_ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.COLORJET_ANDROID_KEY_PASSWORD }}
         run: bash repo/v17-build/configure-eas-local-signing.sh work
 
       - name: Link or create the Expo project
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         shell: bash
         run: |
           set +e
@@ -92,6 +93,8 @@ jobs:
           exit $STATUS
 
       - name: Queue and wait for signed Android build
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         working-directory: work
         run: npx --yes eas-cli@latest build --platform android --profile "${{ matrix.profile }}" --non-interactive --wait --json > "eas-${{ matrix.profile }}.json"
 
