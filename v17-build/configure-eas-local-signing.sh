@@ -44,17 +44,19 @@ fs.writeFileSync('credentials.json', JSON.stringify(credentials, null, 2) + '\n'
 NODE
 
 cat > .easignore <<'EOF'
-node_modules/
-.expo/
-dist/
-web-build/
-.env
-android/
-ios/
-.DS_Store
-npm-debug.log*
-.git/
-.github/
+/node_modules/
+/.expo/
+/dist/
+/web-build/
+/.env
+/android/
+/ios/
+/.DS_Store
+/npm-debug.log*
+/.git/
+/.github/
 EOF
 
+test -f credentials.json
+test -f credentials/android/colorjet-release.jks
 echo "Expo config and original Android signing credential validated."
