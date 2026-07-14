@@ -1,15 +1,15 @@
-name: Build COLORJET Management Suite V3.1 Final Merge
+name: Build COLORJET Management Suite V3.1.1 Compiler Release
 
 on:
   push:
     branches: [managementsuite-v17-merged-build]
     paths:
-      - 'build-source-v17/**'
+      - 'build-source-v311/**'
       - '.github/workflows/build-managementsuite-v31-final.yml'
   pull_request:
     branches: [main]
     paths:
-      - 'build-source-v17/**'
+      - 'build-source-v311/**'
       - '.github/workflows/build-managementsuite-v31-final.yml'
   workflow_dispatch:
 
@@ -20,6 +20,11 @@ jobs:
   android:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      SOURCE_SHA256: cfd613ebc6d368ab10435d88f589473ce4702af637c87e19ccf5a679bdfa5ba3
+      EXPECTED_PACKAGE: com.colorjetbd.managementsuite
+      EXPECTED_VERSION: 3.1.1
+      EXPECTED_VERSION_CODE: '3101'
     steps:
       - uses: actions/checkout@v4
 
@@ -39,149 +44,113 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
-      - name: Reconstruct exact verified merged source
+      - name: Reconstruct exact verified V3.1.1 source
+        shell: bash
         run: |
           set -euo pipefail
-          mkdir -p build/mobile
+          mkdir -p build/mobile build/output
           cat \
-            build-source-v17/source.part.00 \
-            build-source-v17/source.part.01 \
-            build-source-v17/source.part.02 \
-            build-source-v17/source.part.030 \
-            build-source-v17/source.part.031 \
-            build-source-v17/source.part.032 \
-            build-source-v17/source.part.040 \
-            build-source-v17/source.part.041 \
-            build-source-v17/source.part.042 \
-            build-source-v17/source.part.05 \
-            build-source-v17/source.part.060 \
-            build-source-v17/source.part.061 \
-            build-source-v17/source.part.062 \
-            build-source-v17/source.part.070 \
-            build-source-v17/source.part.071 \
-            build-source-v17/source.part.072 \
-            build-source-v17/source.part.080 \
-            build-source-v17/source.part.081 \
-            build-source-v17/source.part.082 \
-            build-source-v17/source.part.090 \
-            build-source-v17/source.part.091 \
-            | base64 --decode > "$RUNNER_TEMP/source.tar.gz"
-          echo "06af5f6ca339af0620a88cd466ba87d4ef38baebd40ec601eb96605c79bee4cd  $RUNNER_TEMP/source.tar.gz" | sha256sum -c -
-          gzip -t "$RUNNER_TEMP/source.tar.gz"
-          tar -xzf "$RUNNER_TEMP/source.tar.gz" -C build/mobile
-          cp -a build-source-v17/patches/. build/mobile/
+            build-source-v311/source.part.00 \
+            build-source-v311/source.part.01 \
+            build-source-v311/source.part.02 \
+            build-source-v311/source.part.03 \
+            build-source-v311/source.part.04 \
+            | base64 --decode > "$RUNNER_TEMP/COLORJET_V311_MERGED_SOURCE.tar.gz"
+          echo "${SOURCE_SHA256}  $RUNNER_TEMP/COLORJET_V311_MERGED_SOURCE.tar.gz" | sha256sum --check
+          gzip --test "$RUNNER_TEMP/COLORJET_V311_MERGED_SOURCE.tar.gz"
+          tar -xzf "$RUNNER_TEMP/COLORJET_V311_MERGED_SOURCE.tar.gz" -C build/mobile
           test -f build/mobile/package.json
           test -f build/mobile/app.json
           test -f build/mobile/src/core/moduleRegistry.ts
-          ! grep -R --exclude-dir=node_modules --exclude-dir=android --exclude='*.md' -n 'ridaa\.xyz' build/mobile
+          cp "$RUNNER_TEMP/COLORJET_V311_MERGED_SOURCE.tar.gz" build/output/
 
-      - name: Install and validate merged source
+      - name: Verify app identity and protected icon path
         working-directory: build/mobile
+        shell: bash
         run: |
-          pnpm install --no-frozen-lockfile
-          pnpm run typecheck
-          CI=1 pnpm exec expo install --check
-          CI=1 pnpm exec expo prebuild --platform android --clean --no-install
+          node - <<'NODE'
+          const fs = require('fs');
+          const app = JSON.parse(fs.readFileSync('app.json', 'utf8')).expo;
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          if (app.android.package !== process.env.EXPECTED_PACKAGE) throw new Error(`Package mismatch: ${app.android.package}`);
+          if (app.version !== process.env.EXPECTED_VERSION || pkg.version !== process.env.EXPECTED_VERSION) throw new Error('Version mismatch');
+          if (String(app.android.versionCode) !== process.env.EXPECTED_VERSION_CODE) throw new Error(`versionCode mismatch: ${app.android.versionCode}`);
+          if (app.icon !== './assets/images/colorjet-original-icon.webp') throw new Error('Original COLORJET icon path changed');
+          if (!fs.existsSync('assets/images/colorjet-original-icon.webp')) throw new Error('Original COLORJET icon missing');
+          console.log(JSON.stringify({name: app.name, package: app.android.package, version: app.version, versionCode: app.android.versionCode, icon: app.icon}, null, 2));
+          NODE
 
-      - name: Compile fresh release APK and AAB
+      - name: Install and validate source
+        working-directory: build/mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --no-frozen-lockfile
+          CI=1 pnpm exec expo install --check
+          pnpm run verify
+
+      - name: Generate fresh native Android project
+        working-directory: build/mobile
+        run: CI=1 pnpm exec expo prebuild --platform android --clean --no-install
+
+      - name: Compile APK and AAB
         working-directory: build/mobile/android
+        shell: bash
         run: |
           set -o pipefail
           chmod +x gradlew
           ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace 2>&1 | tee ../gradle-build.log
 
-      - name: Upload Gradle diagnostics on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: COLORJET-V3.1-FINAL-GRADLE-LOG
-          path: build/mobile/gradle-build.log
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Generate isolated release signing key
-        run: |
-          set -euo pipefail
-          KEYSTORE="$RUNNER_TEMP/colorjet-v31-final.jks"
-          PASSWORD="$(openssl rand -hex 24)"
-          ALIAS='colorjet-v31-final'
-          keytool -genkeypair \
-            -keystore "$KEYSTORE" \
-            -storepass "$PASSWORD" \
-            -keypass "$PASSWORD" \
-            -alias "$ALIAS" \
-            -keyalg RSA \
-            -keysize 3072 \
-            -validity 10000 \
-            -dname 'CN=COLORJET Bangladesh, OU=Mobile Apps, O=COLORJET Bangladesh, L=Dhaka, ST=Dhaka, C=BD'
-          echo "SIGNING_KEYSTORE=$KEYSTORE" >> "$GITHUB_ENV"
-          echo "SIGNING_PASSWORD=$PASSWORD" >> "$GITHUB_ENV"
-          echo "SIGNING_ALIAS=$ALIAS" >> "$GITHUB_ENV"
-
-      - name: Sign and verify release
+      - name: Verify compiler outputs
         working-directory: build/mobile
+        shell: bash
         run: |
           set -euo pipefail
-          mkdir -p release-package
           APK_SOURCE="$(find android/app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -1)"
           AAB_SOURCE="$(find android/app/build/outputs/bundle/release -maxdepth 1 -type f -name '*.aab' | head -1)"
           test -f "$APK_SOURCE"
           test -f "$AAB_SOURCE"
-
-          APK='release-package/COLORJET-Management-Suite-v3.1.0-FINAL-MERGED-SIGNED.apk'
-          AAB='release-package/COLORJET-Management-Suite-v3.1.0-FINAL-MERGED-SIGNED.aab'
-          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
-
-          "$APKSIGNER" sign \
-            --ks "$SIGNING_KEYSTORE" \
-            --ks-key-alias "$SIGNING_ALIAS" \
-            --ks-pass "pass:$SIGNING_PASSWORD" \
-            --key-pass "pass:$SIGNING_PASSWORD" \
-            --out "$APK" \
-            "$APK_SOURCE"
-          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee release-package/APK_SIGNATURE.txt
-
-          cp "$AAB_SOURCE" "$AAB"
-          jarsigner \
-            -keystore "$SIGNING_KEYSTORE" \
-            -storepass "$SIGNING_PASSWORD" \
-            -keypass "$SIGNING_PASSWORD" \
-            "$AAB" \
-            "$SIGNING_ALIAS"
-          jarsigner -verify -verbose -certs "$AAB" >/dev/null
-
-          zip -qr release-package/COLORJET-MANAGEMENT-SUITE-V3.1-FINAL-MERGED-SOURCE.zip . \
-            -x 'node_modules/*' 'android/*' '.expo/*' 'release-package/*'
-
-          cat > release-package/BUILD_INFO.txt <<'EOF'
-          COLORJET Management Suite V3.1.0 — Final Merged Build
+          ACTUAL_PACKAGE="$(apkanalyzer manifest application-id "$APK_SOURCE")"
+          ACTUAL_CODE="$(apkanalyzer manifest version-code "$APK_SOURCE")"
+          test "$ACTUAL_PACKAGE" = "$EXPECTED_PACKAGE"
+          test "$ACTUAL_CODE" = "$EXPECTED_VERSION_CODE"
+          cp "$APK_SOURCE" ../output/COLORJET-Management-Suite-V3.1.1-COMPILER-TEST.apk
+          cp "$AAB_SOURCE" ../output/COLORJET-Management-Suite-V3.1.1-COMPILER-TEST.aab
+          cp gradle-build.log ../output/GRADLE_BUILD.log
+          apkanalyzer manifest print "$APK_SOURCE" > ../output/ANDROID_MANIFEST.txt
+          cat > ../output/BUILD_INFO.txt <<'EOF'
+          COLORJET Management Suite V3.1.1 — Compiler Test Build
           Package: com.colorjetbd.managementsuite
-          Version: 3.1.0
-          Version Code: 3100
-          Source: Fresh V16 UI + V3 cPanel API/security merge
-          Module definitions: 53
-          Specialized screens: Attendance, Visits, RMA, Shipments, Ledger
-          Other modules: role-aware cPanel list/create contracts
-          Reused old APK: No
-          Hardcoded Replit endpoint: No
-          Embedded employee image seed: Removed
+          Version: 3.1.1
+          Version Code: 3101
+          Source: V16 locked UI merged with V3 cPanel API/security layer
           WebView: No
-          TypeScript validation: Passed
-          Expo dependency validation: Passed
-          Android prebuild: Fresh
-          Gradle APK/AAB compile: Passed
-          Signing mode: isolated ephemeral release key
-          Live cPanel runtime: Not tested in CI
-          Physical Android device runtime: Not tested in CI
-          Update compatibility: Existing app update is not guaranteed because the original production keystore was not used.
+          Original COLORJET icon path: Preserved
+          Embedded production password/secret: Not added
+          Build type: Non-production compiler verification
+          Production signing/upload key: Not used or replaced
+          Play Store update compatibility: Not claimed until signed with the existing production key and checked against the current Play Console versionCode
+          Live cPanel login/API: Not tested by CI
+          Physical Android device: Not tested by CI
           EOF
+          (cd ../output && sha256sum COLORJET-* COLORJET_V311_MERGED_SOURCE.tar.gz ANDROID_MANIFEST.txt BUILD_INFO.txt > SHA256SUMS.txt)
 
-          (cd release-package && sha256sum COLORJET-* APK_SIGNATURE.txt BUILD_INFO.txt > SHA256SUMS.txt)
-
-      - name: Upload final merged release
+      - name: Upload diagnostics on failure
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: COLORJET-MANAGEMENT-SUITE-V3.1-FINAL-APK-AAB-SOURCE
-          path: build/mobile/release-package/*
+          name: COLORJET-V3.1.1-BUILD-DIAGNOSTICS
+          path: |
+            build/mobile/gradle-build.log
+            build/output/**
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload compiler test package
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: COLORJET-MANAGEMENT-SUITE-V3.1.1-COMPILER-TEST
+          path: build/output/*
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 14
