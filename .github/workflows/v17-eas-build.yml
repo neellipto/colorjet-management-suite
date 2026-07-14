@@ -105,6 +105,17 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.COLORJET_ANDROID_KEY_PASSWORD }}
         run: bash repo/v17-build/configure-eas-local-signing.sh work
 
+      - name: Initialize ephemeral Git repository
+        working-directory: work
+        shell: bash
+        run: |
+          git init --quiet
+          git config user.name "COLORJET Build Bot"
+          git config user.email "colorjet-build@users.noreply.github.com"
+          git add -A
+          git commit --quiet -m "COLORJET V17 EAS build snapshot" || true
+          git status --short
+
       - name: Link or create the Expo project
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
