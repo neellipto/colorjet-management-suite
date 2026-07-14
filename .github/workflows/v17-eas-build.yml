@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - build/v17-eas-20260714
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
