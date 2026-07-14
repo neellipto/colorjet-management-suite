@@ -74,8 +74,15 @@ jobs:
 
       - name: Install Expo dependencies with Yarn
         working-directory: work
+        shell: bash
         run: |
-          yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
+          set +e
+          yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000 > ../yarn-install.log 2>&1
+          STATUS=$?
+          if [ "$STATUS" -ne 0 ]; then
+            tail -n 60 ../yarn-install.log
+            exit "$STATUS"
+          fi
           test -f node_modules/expo-router/package.json
           test -f node_modules/expo/package.json
           test -f node_modules/expo-splash-screen/package.json
@@ -88,6 +95,7 @@ jobs:
           pkg.packageManager = 'yarn@1.22.22';
           fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           NODE
+          echo "Yarn dependency installation passed."
 
       - name: Configure Expo and original signing key
         env:
@@ -109,8 +117,11 @@ jobs:
           cd work
           npx --yes eas-cli@latest project:init --force --non-interactive > ../project-init.log 2>&1
           STATUS=$?
-          cat ../project-init.log
-          exit $STATUS
+          if [ "$STATUS" -ne 0 ]; then
+            tail -n 60 ../project-init.log
+            exit "$STATUS"
+          fi
+          tail -n 10 ../project-init.log
 
       - name: Queue and wait for signed Android build
         env:
@@ -125,8 +136,9 @@ jobs:
           npx --yes eas-cli@latest build --platform android --profile "${{ matrix.profile }}" --non-interactive --wait --json > "eas-${{ matrix.profile }}.json" 2> "eas-${{ matrix.profile }}.err"
           STATUS=$?
           if [ "$STATUS" -ne 0 ]; then
-            tail -n 80 "eas-${{ matrix.profile }}.err"
-            test ! -s "eas-${{ matrix.profile }}.json" || tail -n 40 "eas-${{ matrix.profile }}.json"
+            echo "EAS build command failed for ${{ matrix.profile }}:"
+            tail -n 100 "eas-${{ matrix.profile }}.err"
+            test ! -s "eas-${{ matrix.profile }}.json" || tail -n 60 "eas-${{ matrix.profile }}.json"
             exit "$STATUS"
           fi
 
