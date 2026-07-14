@@ -75,8 +75,7 @@ jobs:
       - name: Install Expo dependencies with Yarn
         working-directory: work
         run: |
-          yarn --version
-          yarn install --ignore-scripts --non-interactive --no-progress --network-timeout 600000
+          yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
           test -f node_modules/expo-router/package.json
           test -f node_modules/expo/package.json
           test -f node_modules/expo-splash-screen/package.json
@@ -120,7 +119,16 @@ jobs:
           NPM_CONFIG_AUDIT: 'false'
           NPM_CONFIG_FUND: 'false'
         working-directory: work
-        run: npx --yes eas-cli@latest build --platform android --profile "${{ matrix.profile }}" --non-interactive --wait --json > "eas-${{ matrix.profile }}.json"
+        shell: bash
+        run: |
+          set +e
+          npx --yes eas-cli@latest build --platform android --profile "${{ matrix.profile }}" --non-interactive --wait --json > "eas-${{ matrix.profile }}.json" 2> "eas-${{ matrix.profile }}.err"
+          STATUS=$?
+          if [ "$STATUS" -ne 0 ]; then
+            tail -n 80 "eas-${{ matrix.profile }}.err"
+            test ! -s "eas-${{ matrix.profile }}.json" || tail -n 40 "eas-${{ matrix.profile }}.json"
+            exit "$STATUS"
+          fi
 
       - name: Download signed output
         working-directory: work
