@@ -14,6 +14,7 @@ permissions:
 
 env:
   V17_BRANCH: build/v17-eas-20260714
+  SOURCE_ZIP: COLORJET_MANAGEMENT_SUITE_V17_0_MOBILE_SOURCE.zip
 
 jobs:
   verify:
@@ -25,21 +26,26 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           git clone --quiet --depth 1 --branch "$V17_BRANCH" "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" repo
-      - name: Extract V17 source
+
+      - name: Extract uploaded V17 source
         run: |
-          ls -lh repo/v17-build/v17-eas-source.tar.gz
-          gzip -t repo/v17-build/v17-eas-source.tar.gz
+          ls -lh "repo/$SOURCE_ZIP"
+          unzip -t "repo/$SOURCE_ZIP" >/dev/null
           mkdir -p work
-          tar -xzf repo/v17-build/v17-eas-source.tar.gz -C work
+          unzip -q "repo/$SOURCE_ZIP" -d work
           test -f work/package.json
           test -f work/app.json
+          test -f work/eas.json
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+
       - name: Install dependencies
         working-directory: work
         run: npm install
+
       - name: Verify source
         working-directory: work
         run: npm run verify
@@ -60,30 +66,98 @@ jobs:
             filename: COLORJET_MANAGEMENT_SUITE_V17_0_SIGNED.aab
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.COLORJET_ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.COLORJET_ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.COLORJET_ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.COLORJET_ANDROID_KEY_PASSWORD }}
     steps:
       - name: Clone authoritative V17 branch
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           git clone --quiet --depth 1 --branch "$V17_BRANCH" "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" repo
-      - name: Extract V17 source
+
+      - name: Extract uploaded V17 source
         run: |
-          gzip -t repo/v17-build/v17-eas-source.tar.gz
+          unzip -t "repo/$SOURCE_ZIP" >/dev/null
           mkdir -p work
-          tar -xzf repo/v17-build/v17-eas-source.tar.gz -C work
+          unzip -q "repo/$SOURCE_ZIP" -d work
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+
       - name: Install dependencies
         working-directory: work
         run: npm install
-      - name: Link existing Expo project
+
+      - name: Configure Expo project and local credentials
+        working-directory: work
+        shell: bash
+        run: |
+          test -n "$EXPO_TOKEN"
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+
+          node <<'NODE'
+          const fs = require('fs');
+          const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+          app.expo.owner = 'neellipto';
+          fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
+
+          const eas = JSON.parse(fs.readFileSync('eas.json', 'utf8'));
+          eas.build.preview.credentialsSource = 'local';
+          eas.build.production.credentialsSource = 'local';
+          fs.writeFileSync('eas.json', JSON.stringify(eas, null, 2) + '\n');
+          NODE
+
+          mkdir -p credentials/android
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > credentials/android/colorjet-release.jks
+          keytool -list \
+            -keystore credentials/android/colorjet-release.jks \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+            -alias "$ANDROID_KEY_ALIAS" >/dev/null
+
+          node <<'NODE'
+          const fs = require('fs');
+          const credentials = {
+            android: {
+              keystore: {
+                keystorePath: 'credentials/android/colorjet-release.jks',
+                keystorePassword: process.env.ANDROID_KEYSTORE_PASSWORD,
+                keyAlias: process.env.ANDROID_KEY_ALIAS,
+                keyPassword: process.env.ANDROID_KEY_PASSWORD
+              }
+            }
+          };
+          fs.writeFileSync('credentials.json', JSON.stringify(credentials, null, 2) + '\n');
+          NODE
+
+          cat > .easignore <<'EOF'
+          node_modules/
+          .expo/
+          dist/
+          web-build/
+          .env
+          android/
+          ios/
+          .DS_Store
+          npm-debug.log*
+          .git/
+          .github/
+          EOF
+
+      - name: Link or create the Expo project
         working-directory: work
         run: npx --yes eas-cli@latest project:init --force --non-interactive
+
       - name: Queue and wait for signed Android build
         working-directory: work
         run: npx --yes eas-cli@latest build --platform android --profile "${{ matrix.profile }}" --non-interactive --wait --json > "eas-${{ matrix.profile }}.json"
+
       - name: Download signed output
         working-directory: work
         shell: bash
@@ -93,6 +167,7 @@ jobs:
           test "$BUILD_URL" != "null"
           curl --fail --location --retry 5 "$BUILD_URL" --output "${{ matrix.filename }}"
           sha256sum "${{ matrix.filename }}" > "${{ matrix.filename }}.sha256"
+
       - name: Upload signed output
         uses: actions/upload-artifact@v4
         with:
