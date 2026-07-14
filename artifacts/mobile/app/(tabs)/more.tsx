@@ -23,7 +23,10 @@ function MenuItem({ icon, label, subtitle, onPress, iconBg, iconColor, badge }: 
   return (
     <TouchableOpacity
       style={[styles.menuItem, { backgroundColor: colors.card, borderColor: colors.border }]}
-      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
       activeOpacity={0.75}
     >
       <View style={[styles.menuIcon, { backgroundColor: iconBg ?? colors.navyLight }]}>
@@ -49,15 +52,24 @@ export default function MoreScreen() {
   const insets = useSafeAreaInsets();
   const { currentUser, logout, notifications, products } = useApp();
   const role = currentUser?.role ?? 'customer';
+
   const isAdmin = role === 'admin' || role === 'manager';
+  const isOwnerAdmin = role === 'admin';
   const isAccounts = role === 'accounts';
   const isMarketing = role === 'marketing' || role === 'sales';
   const isEngineer = role === 'engineer';
   const isStore = role === 'store';
   const isServiceControl = role === 'service_control';
+  const canManageService = isAdmin || isServiceControl;
+  const canUseService = canManageService || isEngineer || isMarketing;
+  const canUseParts = canManageService || isEngineer || isStore;
+  const canUseTasks = isAdmin || isServiceControl || isAccounts || isMarketing || isEngineer || isStore;
+  const canUseImport = isAdmin || isAccounts || isStore || isMarketing;
+  const canUseHr = isAdmin || isAccounts || isEngineer || isStore || isMarketing || isServiceControl;
+  const canViewBiometric = isAdmin || isAccounts;
 
-  const lowStockCount = products.filter(p => p.currentStock < p.minStockQty).length;
-  const unread = notifications.filter(n => !n.isRead).length;
+  const lowStockCount = products.filter(product => product.currentStock < product.minStockQty).length;
+  const unread = notifications.filter(notification => !notification.isRead).length;
 
   const pb = insets.bottom + (Platform.OS === 'web' ? 34 : 0) + 70;
   const pt = Platform.OS === 'web' ? 67 : 0;
@@ -65,7 +77,14 @@ export default function MoreScreen() {
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: () => { logout(); router.replace('/login'); } },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: () => {
+          logout();
+          router.replace('/login');
+        },
+      },
     ]);
   };
 
@@ -76,7 +95,7 @@ export default function MoreScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={[styles.userCard, { backgroundColor: colors.primary }]}>
-        <View style={[styles.userAvatar, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+        <View style={styles.userAvatar}>
           <Feather name="user" size={24} color="#fff" />
         </View>
         <View style={styles.userInfo}>
@@ -86,81 +105,84 @@ export default function MoreScreen() {
         </View>
       </View>
 
-      {isAdmin && (
+      {isAdmin ? (
         <>
           <SectionLabel label="ADMIN CONTROL CENTER" />
-          <MenuItem icon="briefcase" label="Company Profile" subtitle="Business info and contacts" onPress={() => router.push('/admin/company' as any)} iconBg={colors.navyLight} iconColor={colors.primary} />
-          <MenuItem icon="droplet" label="Branding" subtitle="Theme, colors, appearance" onPress={() => router.push('/admin/branding' as any)} iconBg={colors.orangeLight} iconColor={colors.secondary} />
+          <MenuItem icon="briefcase" label="Company Profile" subtitle="Business info and contacts" onPress={() => router.push('/admin/company' as any)} />
+          <MenuItem icon="droplet" label="Branding" subtitle="Theme, colors and appearance" onPress={() => router.push('/admin/branding' as any)} iconBg={colors.orangeLight} iconColor={colors.secondary} />
           <MenuItem icon="grid" label="Catalog & Categories" subtitle="Product categories and assets" onPress={() => router.push('/admin/catalog' as any)} iconBg="#E8F5E9" iconColor="#2E7D32" />
-          <MenuItem icon="users" label="User Management" subtitle="Accounts, roles, access" onPress={() => router.push('/admin/users' as any)} iconBg="#E3F2FD" iconColor="#1565C0" />
-          <MenuItem icon="tool" label="Engineer Management" subtitle="Skills, KPIs, permissions" onPress={() => router.push('/admin/engineers' as any)} iconBg="#FFF8E1" iconColor="#F57F17" />
+          <MenuItem icon="users" label="User Management" subtitle="Accounts, roles and access" onPress={() => router.push('/admin/users' as any)} iconBg="#E3F2FD" iconColor="#1565C0" />
+          <MenuItem icon="tool" label="Engineer Management" subtitle="Skills, KPIs and permissions" onPress={() => router.push('/admin/engineers' as any)} iconBg="#FFF8E1" iconColor="#F57F17" />
           <MenuItem icon="link" label="Integrations" subtitle="Odoo and messaging channels" onPress={() => router.push('/admin/integrations' as any)} iconBg="#F3E5F5" iconColor="#7B1FA2" />
-          <MenuItem icon="sliders" label="Notification Settings" subtitle="Alerts and channels" onPress={() => router.push('/admin/notifications' as any)} iconBg="#FFEBEE" iconColor="#C62828" />
+          <MenuItem icon="sliders" label="Notification Settings" subtitle="Alerts and delivery channels" onPress={() => router.push('/admin/notifications' as any)} iconBg="#FFEBEE" iconColor="#C62828" />
         </>
-      )}
+      ) : null}
 
-      {(isAdmin || isServiceControl) && (
+      {canUseService ? (
         <>
-          <SectionLabel label="SERVICE OPERATIONS" />
-          <MenuItem icon="activity" label="Field Operations V12" subtitle="Live travel, GPS check-in, SLA and route audit" onPress={() => router.push('/field-operations' as any)} iconBg="#E3F2FD" iconColor="#1565C0" />
-          <MenuItem icon="monitor" label="Service Control" subtitle="Live ticket dashboard" onPress={() => router.push('/service-control' as any)} iconBg={colors.navyLight} iconColor={colors.primary} />
-          <MenuItem icon="calendar" label="Engineer Schedule" subtitle="Plan and track visits" onPress={() => router.push('/schedule' as any)} iconBg="#E8F5E9" iconColor="#2E7D32" />
+          <SectionLabel label="SERVICE, WARRANTY & SLA" />
+          <MenuItem icon="shield" label="Service & Warranty Center" subtitle="Cases, serial validity and warranty registration" onPress={() => router.push('/service-warranty' as any)} iconBg="#E8F5E9" iconColor="#2E7D32" />
+          <MenuItem icon="clock" label="Engineer SLA Dashboard" subtitle="Response, arrival and resolution breach alerts" onPress={() => router.push('/sla-dashboard' as any)} iconBg="#FFF3E0" iconColor="#E65100" />
+          <MenuItem icon="activity" label="Field Operations" subtitle="Travel, GPS check-in and route audit" onPress={() => router.push('/field-operations' as any)} iconBg="#E3F2FD" iconColor="#1565C0" />
+          <MenuItem icon="calendar" label="Engineer Schedule" subtitle="Plan and track customer visits" onPress={() => router.push('/schedule' as any)} iconBg="#E8F5E9" iconColor="#2E7D32" />
+          {canManageService ? <MenuItem icon="monitor" label="Legacy Service Control" subtitle="Existing ticket dashboard retained" onPress={() => router.push('/service-control' as any)} /> : null}
         </>
-      )}
+      ) : null}
 
-      {(isAdmin || isAccounts) && (
+      {canUseParts ? (
         <>
-          <SectionLabel label="MANAGEMENT" />
-          <MenuItem icon="bar-chart-2" label="Reports Center" subtitle="Sales, due, expenses, P&L" onPress={() => router.push('/reports' as any)} iconBg="#E3F2FD" iconColor="#1565C0" />
-          <MenuItem icon="truck" label="Deliveries" subtitle="Track all delivery orders" onPress={() => router.push('/delivery' as any)} iconBg={colors.orangeLight} iconColor={colors.secondary} />
-          {isAdmin && <MenuItem icon="users" label="Customers" subtitle="Manage customer accounts" onPress={() => router.push('/(tabs)/sales' as any)} iconBg="#E8F5E9" iconColor="#2E7D32" />}
+          <SectionLabel label="SPARE PARTS OPERATIONS" />
+          <MenuItem icon="package" label="Parts Logistics" subtitle="Approve, reserve, dispatch, receive and post stock" onPress={() => router.push('/parts-logistics' as any)} iconBg="#FFF8E1" iconColor="#F57F17" />
+          {isStore ? (
+            <MenuItem
+              icon="alert-triangle"
+              label="Low Stock Alerts"
+              subtitle={`${lowStockCount} items below minimum`}
+              onPress={() => router.push('/(tabs)/inventory' as any)}
+              iconBg="#FFEBEE"
+              iconColor="#C62828"
+              badge={lowStockCount > 0 ? String(lowStockCount) : undefined}
+            />
+          ) : null}
         </>
-      )}
+      ) : null}
 
-      {(isAdmin || isAccounts) && (
+      {canUseTasks ? (
         <>
-          <SectionLabel label="FINANCE" />
+          <SectionLabel label="OFFICE OPERATIONS" />
+          <MenuItem icon="check-square" label="Office Task Management" subtitle="Assign, follow up, progress and overdue control" onPress={() => router.push('/office-tasks' as any)} iconBg="#E3F2FD" iconColor="#1565C0" />
+        </>
+      ) : null}
+
+      {canUseImport ? (
+        <>
+          <SectionLabel label="IMPORT & LOGISTICS" />
+          <MenuItem icon="globe" label="LC/TT Import Control" subtitle="PI, staged payment, shipment, customs and trucking" onPress={() => router.push('/import-logistics' as any)} iconBg="#E0F7FA" iconColor="#00796B" />
+          <MenuItem icon="truck" label="Customer Deliveries" subtitle="Existing delivery order tracking" onPress={() => router.push('/delivery' as any)} iconBg={colors.orangeLight} iconColor={colors.secondary} />
+        </>
+      ) : null}
+
+      {canUseHr ? (
+        <>
+          <SectionLabel label="PEOPLE OPERATIONS" />
+          <MenuItem icon="users" label="Leave, Payroll & Holidays" subtitle="Leave approval, salary calculation and payment audit" onPress={() => router.push('/hr-operations' as any)} iconBg="#F3E5F5" iconColor="#7B1FA2" />
+        </>
+      ) : null}
+
+      {canViewBiometric ? (
+        <>
+          <SectionLabel label="ATTENDANCE INTEGRATION" />
+          <MenuItem icon="cpu" label="Biometric Connector Center" subtitle={isOwnerAdmin ? 'Configure gateways, devices and employee mapping' : 'Review devices, mappings and punch events'} onPress={() => router.push('/biometric-connectors' as any)} iconBg="#ECEFF1" iconColor="#455A64" />
+        </>
+      ) : null}
+
+      {(isAdmin || isAccounts) ? (
+        <>
+          <SectionLabel label="FINANCE & REPORTING" />
+          <MenuItem icon="bar-chart-2" label="Reports Center" subtitle="Sales, due, expenses and P&L" onPress={() => router.push('/reports' as any)} iconBg="#E3F2FD" iconColor="#1565C0" />
           <MenuItem icon="credit-card" label="Expenses" subtitle="Track and record expenses" onPress={() => router.push('/expenses' as any)} iconBg="#FFEBEE" iconColor="#C62828" />
         </>
-      )}
-
-      {isEngineer && (
-        <>
-          <SectionLabel label="ENGINEER OPERATIONS" />
-          <MenuItem icon="navigation" label="My Field Visits" subtitle="Travel, check-in, work and customer confirmation" onPress={() => router.push('/field-operations' as any)} iconBg="#E3F2FD" iconColor="#1565C0" />
-          <MenuItem icon="calendar" label="My Schedule" subtitle="Assigned customer visits" onPress={() => router.push('/schedule' as any)} iconBg="#E8F5E9" iconColor="#2E7D32" />
-        </>
-      )}
-
-      {isAdmin && (
-        <>
-          <SectionLabel label="OPERATIONS" />
-          <MenuItem icon="truck" label="Deliveries" subtitle="Delivery order tracking" onPress={() => router.push('/delivery' as any)} iconBg={colors.orangeLight} iconColor={colors.secondary} />
-        </>
-      )}
-
-      {isMarketing && (
-        <>
-          <SectionLabel label="MY TOOLS" />
-          <MenuItem icon="truck" label="Delivery Support" subtitle="View delivery assignments" onPress={() => router.push('/delivery' as any)} iconBg={colors.orangeLight} iconColor={colors.secondary} />
-          <MenuItem icon="bar-chart-2" label="My Reports" subtitle="Collection and visit summary" onPress={() => router.push('/reports' as any)} iconBg="#E3F2FD" iconColor="#1565C0" />
-        </>
-      )}
-
-      {isStore && (
-        <>
-          <SectionLabel label="STORE TOOLS" />
-          <MenuItem
-            icon="alert-triangle"
-            label="Low Stock Alerts"
-            subtitle={`${lowStockCount} items below minimum`}
-            onPress={() => router.push('/(tabs)/inventory' as any)}
-            iconBg="#FFEBEE"
-            iconColor="#C62828"
-            badge={lowStockCount > 0 ? String(lowStockCount) : undefined}
-          />
-        </>
-      )}
+      ) : null}
 
       <SectionLabel label="NOTIFICATIONS" />
       <MenuItem
@@ -177,15 +199,15 @@ export default function MoreScreen() {
       <MenuItem icon="user" label="My Profile" subtitle="View and edit profile" onPress={() => router.push('/profile' as any)} />
 
       <TouchableOpacity
-        style={[styles.logoutBtn, { backgroundColor: '#FFEBEE', borderColor: '#FFCDD2' }]}
+        style={styles.logoutBtn}
         onPress={handleLogout}
         activeOpacity={0.8}
       >
         <Feather name="log-out" size={18} color="#C62828" />
-        <Text style={[styles.logoutText, { color: '#C62828' }]}>Sign Out</Text>
+        <Text style={styles.logoutText}>Sign Out</Text>
       </TouchableOpacity>
 
-      <Text style={[styles.version, { color: colors.mutedForeground }]}>COLORJET ERP V12 Engineer Operations · Bangladesh</Text>
+      <Text style={[styles.version, { color: colors.mutedForeground }]}>COLORJET ERP V13 Business Operations · Bangladesh</Text>
     </ScrollView>
   );
 }
@@ -193,7 +215,7 @@ export default function MoreScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   userCard: { borderRadius: 14, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 8 },
-  userAvatar: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+  userAvatar: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)' },
   userInfo: { flex: 1, gap: 2 },
   userName: { fontSize: 17, fontFamily: 'Inter_700Bold', color: '#fff' },
   userRole: { fontSize: 12, fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.8)' },
@@ -204,7 +226,7 @@ const styles = StyleSheet.create({
   menuText: { flex: 1, gap: 2 },
   menuLabel: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   menuSub: { fontSize: 12, fontFamily: 'Inter_400Regular' },
-  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 14, borderRadius: 12, borderWidth: 1, marginTop: 8 },
-  logoutText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#FFCDD2', backgroundColor: '#FFEBEE', marginTop: 8 },
+  logoutText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#C62828' },
   version: { fontSize: 11, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingVertical: 8 },
 });

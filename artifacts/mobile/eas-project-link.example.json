@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "<EAS_PROJECT_UUID_FROM_EXPO_ACCOUNT>"
+      }
+    }
+  }
+}

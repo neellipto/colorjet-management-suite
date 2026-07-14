@@ -1,0 +1,57 @@
+name: V13 Operations Monitor
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v13-operations-monitor
+  cancel-in-progress: false
+
+jobs:
+  evaluate-operational-alerts:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - name: Validate protected configuration
+        shell: bash
+        run: |
+          if [ -z "$SUPABASE_URL" ]; then
+            echo "Missing GitHub Secret: SUPABASE_URL"
+            exit 1
+          fi
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "Missing GitHub Secret: SUPABASE_SERVICE_ROLE_KEY"
+            exit 1
+          fi
+
+      - name: Refresh service SLA alerts
+        shell: bash
+        run: |
+          response=$(curl --fail-with-body --silent --show-error \
+            --request POST \
+            --url "$SUPABASE_URL/rest/v1/rpc/v13_refresh_sla_alerts" \
+            --header "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            --header "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            --header "Content-Type: application/json" \
+            --data '{}')
+          echo "SLA evaluation completed. New alerts: $response"
+
+      - name: Mark overdue office tasks
+        shell: bash
+        run: |
+          response=$(curl --fail-with-body --silent --show-error \
+            --request POST \
+            --url "$SUPABASE_URL/rest/v1/rpc/v13_mark_overdue_tasks" \
+            --header "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            --header "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            --header "Content-Type: application/json" \
+            --data '{}')
+          echo "Office task evaluation completed. Newly overdue: $response"

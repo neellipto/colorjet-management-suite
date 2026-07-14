@@ -1,10 +1,13 @@
-name: V12 Migration Check
+name: V13 Stacked Migration Check
 
 on:
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - feature/v12-engineer-operations
     paths:
       - 'supabase/migrations/20260712*_v12_*.sql'
+      - 'supabase/migrations/20260712*_v13_*.sql'
       - '.github/workflows/v12-migration-check.yml'
   workflow_dispatch:
 
@@ -17,11 +20,11 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: colorjet_v12_test
+          POSTGRES_DB: colorjet_v13_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d colorjet_v12_test"
+          --health-cmd "pg_isready -U postgres -d colorjet_v13_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -31,16 +34,18 @@ jobs:
       PGHOST: localhost
       PGPORT: 5432
       PGUSER: postgres
-      PGDATABASE: colorjet_v12_test
+      PGDATABASE: colorjet_v13_test
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Bootstrap Supabase-compatible auth objects
+      - name: Bootstrap Supabase-compatible auth and inventory objects
         shell: bash
         run: |
-          psql -v ON_ERROR_STOP=1 <<'SQL'
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 2>&1 <<'SQL' | tee 00-bootstrap.log
           create role authenticated nologin;
+          create role service_role nologin;
           create schema auth;
           create table auth.users (
             id uuid primary key,
@@ -62,32 +67,121 @@ jobs:
             role_id uuid not null references public.roles(id),
             primary key (user_id, role_id)
           );
+          create table public.stock_balances (
+            product_id uuid not null,
+            warehouse_id uuid not null,
+            quantity numeric(14,3) not null default 0,
+            primary key (product_id, warehouse_id)
+          );
+          create table public.stock_movements (
+            id uuid primary key default gen_random_uuid(),
+            product_id uuid,
+            warehouse_id uuid,
+            movement_type text,
+            quantity numeric(14,3),
+            reference_no text,
+            note text,
+            created_by uuid,
+            created_at timestamptz not null default timezone('utc', now())
+          );
+          create table public.warehouses (
+            id uuid primary key default gen_random_uuid(),
+            code text not null unique,
+            name text not null
+          );
           SQL
 
       - name: Apply V12 engineer operations migration
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712101800_v12_engineer_operations.sql
-
-      - name: Apply V12 transactional parts migration
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712111000_v12_parts_request_rpc.sql
-
-      - name: Verify required V12 objects
         shell: bash
         run: |
-          psql -v ON_ERROR_STOP=1 <<'SQL'
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712101800_v12_engineer_operations.sql 2>&1 | tee 10-v12-engineer.log
+
+      - name: Apply V12 transactional parts migration
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712111000_v12_parts_request_rpc.sql 2>&1 | tee 11-v12-parts.log
+
+      - name: Apply V13 service, warranty and SLA migration
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712120000_v13_service_warranty_sla.sql 2>&1 | tee 20-v13-service.log
+
+      - name: Apply V13 parts and stock migration
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712121000_v13_parts_stock_workflow.sql 2>&1 | tee 21-v13-parts.log
+
+      - name: Apply V13 reservation correction
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712121500_v13_parts_dispatch_reservation_fix.sql 2>&1 | tee 22-v13-reservation-fix.log
+
+      - name: Apply V13 office task migration
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712122000_v13_office_tasks.sql 2>&1 | tee 30-v13-office-tasks.log
+
+      - name: Apply V13 import logistics migration
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712122100_v13_import_logistics.sql 2>&1 | tee 31-v13-import-logistics.log
+
+      - name: Apply V13 HR payroll migration
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712122200_v13_hr_payroll.sql 2>&1 | tee 32-v13-hr-payroll.log
+
+      - name: Apply V13 biometric connector migration
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712122300_v13_biometric_connectors.sql 2>&1 | tee 33-v13-biometric.log
+
+      - name: Apply V13 notification outbox migration
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260712122500_v13_alert_notification_outbox.sql 2>&1 | tee 34-v13-notification-outbox.log
+
+      - name: Verify required V12 and V13 objects
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 2>&1 <<'SQL' | tee 90-verification.log
           do $$
           begin
-            if to_regclass('public.v12_customer_visits') is null then
-              raise exception 'v12_customer_visits missing';
-            end if;
-            if to_regclass('public.v12_location_points') is null then
-              raise exception 'v12_location_points missing';
-            end if;
-            if to_regprocedure('public.v12_transition_visit(uuid,text,text,double precision,double precision,double precision,text,text)') is null then
-              raise exception 'v12_transition_visit missing';
-            end if;
-            if to_regprocedure('public.v12_create_parts_request(uuid,uuid,text,text,text,timestamp with time zone,jsonb)') is null then
-              raise exception 'v12_create_parts_request missing';
-            end if;
+            if to_regclass('public.v12_customer_visits') is null then raise exception 'v12_customer_visits missing'; end if;
+            if to_regprocedure('public.v12_create_parts_request(uuid,uuid,text,text,text,timestamp with time zone,jsonb)') is null then raise exception 'v12_create_parts_request missing'; end if;
+            if to_regclass('public.v13_service_cases') is null then raise exception 'v13_service_cases missing'; end if;
+            if to_regclass('public.v13_warranty_registrations') is null then raise exception 'v13_warranty_registrations missing'; end if;
+            if to_regprocedure('public.v13_refresh_sla_alerts()') is null then raise exception 'v13_refresh_sla_alerts missing'; end if;
+            if to_regclass('public.v13_parts_reservations') is null then raise exception 'v13_parts_reservations missing'; end if;
+            if to_regprocedure('public.v13_create_parts_dispatch(uuid,uuid,text,uuid,text,text,text,numeric,timestamp with time zone,jsonb)') is null then raise exception 'v13_create_parts_dispatch missing'; end if;
+            if to_regclass('public.v13_office_tasks') is null then raise exception 'v13_office_tasks missing'; end if;
+            if to_regclass('public.v13_import_orders') is null then raise exception 'v13_import_orders missing'; end if;
+            if to_regclass('public.v13_shipments') is null then raise exception 'v13_shipments missing'; end if;
+            if to_regclass('public.v13_trucking_jobs') is null then raise exception 'v13_trucking_jobs missing'; end if;
+            if to_regclass('public.v13_leave_requests') is null then raise exception 'v13_leave_requests missing'; end if;
+            if to_regclass('public.v13_payroll_entries') is null then raise exception 'v13_payroll_entries missing'; end if;
+            if to_regclass('public.v13_biometric_connectors') is null then raise exception 'v13_biometric_connectors missing'; end if;
+            if to_regprocedure('public.v13_ingest_biometric_event(text,text,text,timestamp with time zone,text,text,text,text,jsonb,text)') is null then raise exception 'v13_ingest_biometric_event missing'; end if;
+            if to_regclass('public.v13_notification_outbox') is null then raise exception 'v13_notification_outbox missing'; end if;
           end;
           $$;
           SQL
+
+      - name: Upload migration diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v13-postgres-migration-logs
+          path: '*.log'
+          if-no-files-found: warn

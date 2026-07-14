@@ -1,0 +1,175 @@
+name: V13 Full Stack Check
+
+on:
+  pull_request:
+    branches:
+      - main
+      - feature/v12-engineer-operations
+    paths:
+      - 'supabase/migrations/20260712*_v12_*.sql'
+      - 'supabase/migrations/20260712*_v13_*.sql'
+      - '.github/workflows/v13-full-stack-check.yml'
+  push:
+    branches:
+      - feature/v13-service-business-operations
+  workflow_dispatch:
+
+jobs:
+  final-postgres-stack:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: colorjet_v13_final
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d colorjet_v13_final"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PGPASSWORD: postgres
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGDATABASE: colorjet_v13_final
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bootstrap Supabase-compatible dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 2>&1 <<'SQL' | tee 00-bootstrap.log
+          create extension if not exists pgcrypto;
+          create role authenticated nologin;
+          create role service_role nologin;
+          create schema auth;
+          create table auth.users (
+            id uuid primary key,
+            email text
+          );
+          create or replace function auth.uid()
+          returns uuid
+          language sql
+          stable
+          as $$
+            select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+          $$;
+          create table public.roles (
+            id uuid primary key,
+            code text not null unique
+          );
+          create table public.user_roles (
+            user_id uuid not null references auth.users(id),
+            role_id uuid not null references public.roles(id),
+            primary key (user_id, role_id)
+          );
+          create table public.stock_balances (
+            product_id uuid not null,
+            warehouse_id uuid not null,
+            quantity numeric(14,3) not null default 0,
+            primary key (product_id, warehouse_id)
+          );
+          create table public.stock_movements (
+            id uuid primary key default gen_random_uuid(),
+            product_id uuid,
+            warehouse_id uuid,
+            movement_type text,
+            quantity numeric(14,3),
+            reference_no text,
+            note text,
+            created_by uuid,
+            created_at timestamptz not null default timezone('utc', now())
+          );
+          create table public.warehouses (
+            id uuid primary key default gen_random_uuid(),
+            code text not null unique,
+            name text not null
+          );
+          SQL
+
+      - name: Apply ordered V12 and V13 migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          migrations=(
+            supabase/migrations/20260712101800_v12_engineer_operations.sql
+            supabase/migrations/20260712111000_v12_parts_request_rpc.sql
+            supabase/migrations/20260712120000_v13_service_warranty_sla.sql
+            supabase/migrations/20260712121000_v13_parts_stock_workflow.sql
+            supabase/migrations/20260712121500_v13_parts_dispatch_reservation_fix.sql
+            supabase/migrations/20260712122000_v13_office_tasks.sql
+            supabase/migrations/20260712122100_v13_import_logistics.sql
+            supabase/migrations/20260712122200_v13_hr_payroll.sql
+            supabase/migrations/20260712122300_v13_biometric_connectors.sql
+            supabase/migrations/20260712122500_v13_alert_notification_outbox.sql
+            supabase/migrations/20260712123000_v13_legacy_service_backfill.sql
+            supabase/migrations/20260712123100_v13_default_policies.sql
+          )
+
+          for migration in "${migrations[@]}"; do
+            if [ ! -f "$migration" ]; then
+              echo "Missing required migration: $migration"
+              exit 1
+            fi
+            log_name=$(basename "$migration" .sql).log
+            echo "Applying $migration"
+            set -o pipefail
+            psql -v ON_ERROR_STOP=1 -f "$migration" 2>&1 | tee "$log_name"
+          done
+
+      - name: Validate final production objects and defaults
+        shell: bash
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 2>&1 <<'SQL' | tee 99-final-verification.log
+          do $$
+          declare
+            v_leave_type_count integer;
+            v_sla_policy_count integer;
+          begin
+            if to_regclass('public.v13_service_cases') is null then raise exception 'v13_service_cases missing'; end if;
+            if to_regclass('public.v13_warranty_registrations') is null then raise exception 'v13_warranty_registrations missing'; end if;
+            if to_regprocedure('public.v13_backfill_legacy_service_tickets()') is null then raise exception 'legacy backfill function missing'; end if;
+            if to_regclass('public.v13_parts_stock_postings') is null then raise exception 'parts stock postings missing'; end if;
+            if to_regclass('public.v13_office_tasks') is null then raise exception 'office tasks missing'; end if;
+            if to_regclass('public.v13_import_orders') is null then raise exception 'import orders missing'; end if;
+            if to_regclass('public.v13_shipments') is null then raise exception 'shipments missing'; end if;
+            if to_regclass('public.v13_trucking_jobs') is null then raise exception 'trucking jobs missing'; end if;
+            if to_regclass('public.v13_leave_requests') is null then raise exception 'leave requests missing'; end if;
+            if to_regclass('public.v13_payroll_entries') is null then raise exception 'payroll entries missing'; end if;
+            if to_regclass('public.v13_biometric_connectors') is null then raise exception 'biometric connectors missing'; end if;
+            if to_regclass('public.v13_notification_outbox') is null then raise exception 'notification outbox missing'; end if;
+
+            select count(*) into v_leave_type_count
+            from public.v13_leave_types
+            where code in ('CL','SL','EL','UL') and active = true;
+            if v_leave_type_count <> 4 then
+              raise exception 'Default leave types incomplete: %', v_leave_type_count;
+            end if;
+
+            select count(*) into v_sla_policy_count
+            from public.v13_sla_policies
+            where active = true;
+            if v_sla_policy_count < 5 then
+              raise exception 'Default SLA policies incomplete: %', v_sla_policy_count;
+            end if;
+          end;
+          $$;
+          SQL
+
+      - name: Upload final migration logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v13-final-stack-logs
+          path: '*.log'
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,0 +1,74 @@
+name: V13 Standalone Android APK Build
+
+on:
+  push:
+    branches:
+      - feature/v13-service-business-operations
+  pull_request:
+    branches:
+      - feature/v12-engineer-operations
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v13-android-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  build-debug-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    defaults:
+      run:
+        working-directory: artifacts/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install dependencies
+        working-directory: .
+        run: pnpm install --no-frozen-lockfile
+      - name: Align Expo SDK 51 dependencies
+        env:
+          CI: "1"
+        run: pnpm exec expo install --fix
+      - name: Verify React Native Gradle plugin
+        run: node --print "require.resolve('@react-native/gradle-plugin/package.json')"
+      - name: TypeScript check
+        run: pnpm run typecheck
+      - name: Build production web bundle
+        run: pnpm run build
+      - name: Generate Android project
+        env:
+          CI: "1"
+        run: pnpm exec expo prebuild --platform android --clean
+      - name: Compile standalone bundled test APK
+        run: ./gradlew assembleRelease --stacktrace
+        working-directory: artifacts/mobile/android
+      - name: Rename APK and generate checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp android/app/build/outputs/apk/release/app-release.apk COLORJET_ERP_V13_Standalone_Test.apk
+          sha256sum COLORJET_ERP_V13_Standalone_Test.apk > COLORJET_ERP_V13_Standalone_Test.apk.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: COLORJET-ERP-V13-Standalone-Test-APK
+          path: |
+            artifacts/mobile/COLORJET_ERP_V13_Standalone_Test.apk
+            artifacts/mobile/COLORJET_ERP_V13_Standalone_Test.apk.sha256
+          if-no-files-found: error
+          retention-days: 30

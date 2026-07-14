@@ -1,0 +1,128 @@
+name: Android Signed Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Select preview for APK or production for AAB
+        required: true
+        default: preview
+        type: choice
+        options:
+          - preview
+          - production
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-eas-${{ inputs.profile }}
+  cancel-in-progress: false
+
+jobs:
+  signed-android-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      BUILD_PROFILE: ${{ inputs.profile }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Validate protected build configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "Missing GitHub Secret: EXPO_TOKEN"
+            exit 1
+          fi
+          if [ -z "$EXPO_PUBLIC_SUPABASE_URL" ]; then
+            echo "Missing GitHub Secret: EXPO_PUBLIC_SUPABASE_URL"
+            exit 1
+          fi
+          if [ -z "$EXPO_PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "Missing GitHub Secret: EXPO_PUBLIC_SUPABASE_ANON_KEY"
+            exit 1
+          fi
+
+      - name: Install workspace dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Install EAS CLI
+        run: npm install --global eas-cli@latest
+
+      - name: Verify Expo project linkage
+        working-directory: artifacts/mobile
+        run: eas project:info --non-interactive
+
+      - name: Run mobile TypeScript check
+        run: pnpm --filter @workspace/mobile run typecheck
+
+      - name: Build signed Android package
+        id: eas_build
+        working-directory: artifacts/mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          eas build \
+            --platform android \
+            --profile "$BUILD_PROFILE" \
+            --non-interactive \
+            --wait \
+            --json > ../../eas-build.json
+          cat ../../eas-build.json | jq '[.[] | {
+            id,
+            status,
+            platform,
+            distribution,
+            buildProfile,
+            appVersion,
+            appBuildVersion,
+            createdAt,
+            completedAt,
+            artifactUrl: .artifacts.applicationArchiveUrl
+          }]' > ../../eas-build-summary.json
+
+      - name: Download signed APK or AAB
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_url=$(jq -r '.[0].artifacts.applicationArchiveUrl // empty' eas-build.json)
+          if [ -z "$artifact_url" ]; then
+            echo "EAS build completed without an application archive URL"
+            exit 1
+          fi
+
+          if [ "$BUILD_PROFILE" = "production" ]; then
+            output="COLORJET_ERP_V13_Production.aab"
+          else
+            output="COLORJET_ERP_V13_Preview.apk"
+          fi
+
+          curl --fail-with-body --location --retry 3 --output "$output" "$artifact_url"
+          sha256sum "$output" | tee "$output.sha256"
+          echo "ANDROID_ARTIFACT=$output" >> "$GITHUB_ENV"
+
+      - name: Upload signed Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: colorjet-erp-v13-${{ inputs.profile }}
+          path: |
+            ${{ env.ANDROID_ARTIFACT }}
+            ${{ env.ANDROID_ARTIFACT }}.sha256
+            eas-build-summary.json
+          if-no-files-found: error
+          retention-days: 30
