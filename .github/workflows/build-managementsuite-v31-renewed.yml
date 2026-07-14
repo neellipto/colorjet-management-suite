@@ -6,6 +6,11 @@ on:
     paths:
       - 'renewed-v31/**'
       - '.github/workflows/build-managementsuite-v31-renewed.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'renewed-v31/**'
+      - '.github/workflows/build-managementsuite-v31-renewed.yml'
   workflow_dispatch:
 
 permissions:
