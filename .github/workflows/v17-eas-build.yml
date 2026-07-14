@@ -21,18 +21,22 @@ jobs:
         uses: actions/checkout@v4
         with:
           show-progress: false
+      - name: Extract V17 source
+        run: |
+          pwd
+          ls -l v17-build || true
+          file v17-build/v17-eas-source.tar.gz || true
+          wc -c v17-build/v17-eas-source.tar.gz || true
+          gzip -t v17-build/v17-eas-source.tar.gz
+          rm -rf v17-build/work
+          mkdir -p v17-build/work
+          tar -xzf v17-build/v17-eas-source.tar.gz -C v17-build/work
+          test -f v17-build/work/package.json
+          test -f v17-build/work/app.json
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Extract V17 source
-        run: |
-          rm -rf v17-build/work
-          mkdir -p v17-build/work
-          gzip -t v17-build/v17-eas-source.tar.gz
-          tar -xzf v17-build/v17-eas-source.tar.gz -C v17-build/work
-          test -f v17-build/work/package.json
-          test -f v17-build/work/app.json
       - name: Install dependencies
         working-directory: v17-build/work
         run: npm install
@@ -61,16 +65,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           show-progress: false
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
       - name: Extract V17 source
         run: |
           rm -rf v17-build/work
           mkdir -p v17-build/work
           gzip -t v17-build/v17-eas-source.tar.gz
           tar -xzf v17-build/v17-eas-source.tar.gz -C v17-build/work
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Install dependencies
         working-directory: v17-build/work
         run: npm install
