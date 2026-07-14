@@ -34,17 +34,20 @@ jobs:
           mkdir -p work
           unzip -q "repo/$SOURCE_ZIP" -d work
           test -f work/package.json
+          test -f work/package-lock.json
           test -f work/app.json
           test -f work/eas.json
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'
 
       - name: Install dependencies
         working-directory: work
-        run: npm install
+        run: |
+          npm install --global npm@10.8.2
+          npm ci --no-audit --no-fund
 
       - name: Verify source
         working-directory: work
@@ -86,11 +89,13 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'
 
       - name: Install dependencies
         working-directory: work
-        run: npm install
+        run: |
+          npm install --global npm@10.8.2
+          npm ci --no-audit --no-fund
 
       - name: Configure Expo project and local credentials
         working-directory: work
