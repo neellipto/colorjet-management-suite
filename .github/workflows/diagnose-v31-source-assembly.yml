@@ -23,7 +23,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Assemble diagnostic files
         run: |
-          mkdir -p diagnostic
+          mkdir -p diagnostic/source-parts
+          cp build-source-v17/source.part.* diagnostic/source-parts/
           cat \
             build-source-v17/source.part.00 \
             build-source-v17/source.part.01 \
@@ -52,6 +53,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: COLORJET-V31-SOURCE-ASSEMBLY-DIAGNOSTIC
-          path: diagnostic/*
+          path: diagnostic/**
           if-no-files-found: error
           retention-days: 7
