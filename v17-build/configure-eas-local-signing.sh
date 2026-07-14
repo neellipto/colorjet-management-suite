@@ -4,7 +4,6 @@ set -euo pipefail
 WORK_DIR="${1:-work}"
 cd "$WORK_DIR"
 
-test -n "${EXPO_TOKEN:-}"
 test -n "${ANDROID_KEYSTORE_BASE64:-}"
 test -n "${ANDROID_KEYSTORE_PASSWORD:-}"
 test -n "${ANDROID_KEY_ALIAS:-}"
