@@ -1,12 +1,9 @@
-name: Build COLORJET V17 EAS APK and AAB
+name: Build COLORJET V17.1 EAS APK and AAB
 
 on:
   push:
     branches:
       - build/v17-eas-20260714
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
@@ -15,10 +12,12 @@ permissions:
 env:
   V17_BRANCH: build/v17-eas-20260714
   SOURCE_ZIP: COLORJET_MANAGEMENT_SUITE_V17_0_MOBILE_SOURCE.zip
+  APP_VERSION: 1.7.1
+  ANDROID_VERSION_CODE: '1702'
 
 jobs:
   verify:
-    name: Verify V17 source
+    name: Verify authoritative V17 source
     runs-on: ubuntu-latest
     steps:
       - name: Clone authoritative V17 branch
@@ -36,13 +35,14 @@ jobs:
           test -f work/package-lock.json
           test -f work/app.json
           test -f work/eas.json
+          test -f work/assets/images/colorjet-original-icon.webp
           cd work
           node scripts/check-ui-lock.mjs
           node scripts/verify-no-legacy-host.mjs
           node scripts/verify-module-registry.mjs
 
   eas-build:
-    name: EAS ${{ matrix.profile }}
+    name: EAS ${{ matrix.profile }} V17.1
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -52,9 +52,9 @@ jobs:
       matrix:
         include:
           - profile: preview
-            filename: COLORJET_MANAGEMENT_SUITE_V17_0_SIGNED.apk
+            filename: COLORJET_MANAGEMENT_SUITE_V17_1_SIGNED.apk
           - profile: production
-            filename: COLORJET_MANAGEMENT_SUITE_V17_0_SIGNED.aab
+            filename: COLORJET_MANAGEMENT_SUITE_V17_1_SIGNED.aab
     steps:
       - name: Clone authoritative V17 branch
         env:
@@ -72,9 +72,77 @@ jobs:
         with:
           node-version: '22.16.0'
 
-      - name: Correct Expo asset extension without changing original image
+      - name: Prepare V17.1 identity and original COLORJET assets
         working-directory: work
-        run: node ../repo/v17-build/fix-expo-icon-extension.mjs
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const sourceAsset = './assets/images/colorjet-original-icon.webp';
+          const iconAsset = './assets/images/colorjet-original-icon.png';
+          const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+          if (!fs.existsSync(sourceAsset)) {
+            throw new Error(`Missing original COLORJET asset: ${sourceAsset}`);
+          }
+
+          const bytes = fs.readFileSync(sourceAsset);
+          if (!bytes.subarray(0, 8).equals(pngSignature)) {
+            throw new Error('Original COLORJET logo is not PNG content. Build stopped.');
+          }
+          fs.copyFileSync(sourceAsset, iconAsset);
+
+          const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+          app.expo.name = 'COLORJET Management Suite';
+          app.expo.slug = 'colorjet-management-suite';
+          app.expo.version = process.env.APP_VERSION;
+          app.expo.icon = iconAsset;
+          app.expo.scheme = 'colorjet-erp';
+          app.expo.splash = {
+            ...(app.expo.splash || {}),
+            image: iconAsset,
+            resizeMode: 'contain',
+            backgroundColor: '#1A237E'
+          };
+          app.expo.android = {
+            ...(app.expo.android || {}),
+            package: 'com.colorjetbd.managementsuite',
+            versionCode: Number(process.env.ANDROID_VERSION_CODE),
+            adaptiveIcon: {
+              foregroundImage: iconAsset,
+              backgroundColor: '#1A237E'
+            }
+          };
+          app.expo.ios = {
+            ...(app.expo.ios || {}),
+            bundleIdentifier: 'com.colorjetbd.managementsuite'
+          };
+          app.expo.web = {
+            ...(app.expo.web || {}),
+            favicon: iconAsset
+          };
+          app.expo.plugins = (app.expo.plugins || []).map((plugin) => {
+            if (Array.isArray(plugin) && plugin[0] === 'expo-splash-screen') {
+              return ['expo-splash-screen', {
+                ...(plugin[1] || {}),
+                image: iconAsset,
+                imageWidth: 180,
+                resizeMode: 'contain',
+                backgroundColor: '#1A237E'
+              }];
+            }
+            return plugin;
+          });
+          fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
+
+          const eas = JSON.parse(fs.readFileSync('eas.json', 'utf8'));
+          eas.build.production.autoIncrement = false;
+          fs.writeFileSync('eas.json', JSON.stringify(eas, null, 2) + '\n');
+
+          console.log(`Prepared ${app.expo.name} ${app.expo.version} (${app.expo.android.versionCode})`);
+          console.log(`Package: ${app.expo.android.package}`);
+          console.log(`Icon and adaptive icon: ${iconAsset}`);
+          NODE
 
       - name: Install Expo dependencies with Yarn
         working-directory: work
@@ -117,10 +185,10 @@ jobs:
           git config user.name "COLORJET Build Bot"
           git config user.email "colorjet-build@users.noreply.github.com"
           git add -A
-          git commit --quiet -m "COLORJET V17 EAS build snapshot" || true
+          git commit --quiet -m "COLORJET V17.1 EAS build snapshot" || true
           git status --short
 
-      - name: Link or create the Expo project
+      - name: Link Expo project
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           NPM_CONFIG_LOGLEVEL: error
@@ -161,7 +229,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: COLORJET-V17-${{ matrix.profile }}-EAS-DIAGNOSTICS
+          name: COLORJET-V17-1-${{ matrix.profile }}-EAS-DIAGNOSTICS
           path: |
             work/eas-${{ matrix.profile }}.json
             work/eas-${{ matrix.profile }}.err
@@ -184,7 +252,7 @@ jobs:
       - name: Upload signed output
         uses: actions/upload-artifact@v4
         with:
-          name: COLORJET-V17-${{ matrix.profile }}-SIGNED
+          name: COLORJET-V17-1-${{ matrix.profile }}-SIGNED
           path: |
             work/${{ matrix.filename }}
             work/${{ matrix.filename }}.sha256
