@@ -1,0 +1,4 @@
+COLORJET Management Suite V17.1 signed APK/AAB build trigger
+Version: 1.7.1
+Android versionCode: 1702
+Package: com.colorjetbd.managementsuite
