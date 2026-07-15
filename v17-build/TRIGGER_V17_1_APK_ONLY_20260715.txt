@@ -1,0 +1,1 @@
+Trigger signed APK-only workflow for COLORJET Management Suite V17.1
