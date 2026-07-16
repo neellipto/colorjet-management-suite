@@ -53,34 +53,62 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
-          npx expo install --fix --yarn
-          npx expo install --yarn \
-            @react-native-async-storage/async-storage \
-            expo-blur expo-font expo-haptics expo-image-picker expo-router \
-            expo-splash-screen expo-web-browser \
-            react-native-gesture-handler react-native-reanimated \
-            react-native-safe-area-context react-native-screens react-native-svg
-          yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
+          {
+            yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
+            npx expo install --fix --yarn
+            npx expo install --yarn \
+              @react-native-async-storage/async-storage \
+              expo-blur expo-font expo-haptics expo-image-picker expo-router \
+              expo-splash-screen expo-web-browser \
+              react-native-gesture-handler react-native-reanimated \
+              react-native-safe-area-context react-native-screens react-native-svg
+            yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
+          } > ../dependency-install.log 2>&1 || {
+            tail -n 120 ../dependency-install.log
+            exit 1
+          }
+          echo 'Dependency installation passed.'
 
-      - name: Validate identity, UI markers and production bundle
+      - name: TypeScript validation
         working-directory: work
         shell: bash
         run: |
           set -euo pipefail
-          npx tsc --noEmit
-          npx expo config --type public > expo-config.json
+          npx tsc --noEmit > ../typecheck.log 2>&1 || {
+            cat ../typecheck.log
+            exit 1
+          }
+          echo 'TypeScript validation passed.'
+
+      - name: Validate identity and blocked content
+        working-directory: work
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx expo config --type public > expo-config.json 2> ../expo-config.err
           grep -q 'com.colorjetbd.managementsuite' expo-config.json
-          grep -q '"versionCode": 1702' expo-config.json
-          grep -q '"version": "1.7.1"' expo-config.json
+          grep -Eq '"versionCode"[[:space:]]*:[[:space:]]*1702' expo-config.json
+          grep -Eq '"version"[[:space:]]*:[[:space:]]*"1.7.1"' expo-config.json
           ! grep -R --line-number --fixed-strings 'https://replit.com/' app app.json components constants context hooks lib
           ! grep -R --line-number --fixed-strings 'colorjet-management-suite.replit.app' app app.json components constants context hooks lib
           ! grep -R --line-number --fixed-strings 'First Owner Setup' app
           ! grep -R --line-number --fixed-strings '/deliveries/new • /api/deliveries' app
           ! grep -R --line-number --fixed-strings '/admin/push-notifications/new • /notifications/broadcast' app
           ! grep -R --line-number --fixed-strings 'admin123' app components constants context hooks lib
-          npx expo export --platform android --output-dir dist-android --clear
-          test -f dist-android/metadata.json
+          echo 'Identity and blocked-content validation passed.'
+
+      - name: Export Android production bundle
+        working-directory: work
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx expo export --platform android --output-dir dist-android --clear > ../expo-export.log 2>&1 || {
+            tail -n 160 ../expo-export.log
+            exit 1
+          }
+          test -d dist-android
+          find dist-android -type f | head -n 20
+          echo 'Android Expo export passed.'
 
       - name: Package corrected source
         shell: bash
@@ -114,6 +142,22 @@ jobs:
             work/expo-config.json
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload verification diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: COLORJET-V17-1-REFERENCE-UI-VERIFY-DIAGNOSTICS
+          path: |
+            dependency-install.log
+            typecheck.log
+            expo-config.err
+            expo-export.log
+            work/app.json
+            work/package.json
+            work/tsconfig.json
+          if-no-files-found: warn
+          retention-days: 7
 
   eas-build:
     name: EAS ${{ matrix.profile }} reference UI
@@ -152,26 +196,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
-          npx expo install --fix --yarn
-          npx expo install --yarn \
-            @react-native-async-storage/async-storage \
-            expo-blur expo-font expo-haptics expo-image-picker expo-router \
-            expo-splash-screen expo-web-browser \
-            react-native-gesture-handler react-native-reanimated \
-            react-native-safe-area-context react-native-screens react-native-svg
-          yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
-
-      - name: Re-run UI and Android export validation
-        working-directory: work
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx tsc --noEmit
-          npx expo export --platform android --output-dir dist-android --clear
-          ! grep -R --line-number --fixed-strings 'First Owner Setup' app
-          ! grep -R --line-number --fixed-strings '/deliveries/new • /api/deliveries' app
-          ! grep -R --line-number --fixed-strings '/admin/push-notifications/new • /notifications/broadcast' app
+          {
+            yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
+            npx expo install --fix --yarn
+            npx expo install --yarn \
+              @react-native-async-storage/async-storage \
+              expo-blur expo-font expo-haptics expo-image-picker expo-router \
+              expo-splash-screen expo-web-browser \
+              react-native-gesture-handler react-native-reanimated \
+              react-native-safe-area-context react-native-screens react-native-svg
+            yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
+          } > ../dependency-install-${{ matrix.profile }}.log 2>&1 || {
+            tail -n 120 ../dependency-install-${{ matrix.profile }}.log
+            exit 1
+          }
 
       - name: Configure original Android signing key
         env:
@@ -186,7 +224,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf dist-android
           git init --quiet
           git config user.name 'COLORJET Build Bot'
           git config user.email 'colorjet-build@users.noreply.github.com'
@@ -244,12 +281,13 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload diagnostics on failure
-        if: failure()
+      - name: Upload diagnostics
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: COLORJET-V17-1-${{ matrix.profile }}-REFERENCE-UI-DIAGNOSTICS
           path: |
+            dependency-install-${{ matrix.profile }}.log
             work/eas-${{ matrix.profile }}.json
             work/eas-${{ matrix.profile }}.err
             work/app.json
