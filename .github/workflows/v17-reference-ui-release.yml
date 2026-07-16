@@ -1,0 +1,289 @@
+name: Release COLORJET V17.1 Reference UI APK and AAB
+
+on:
+  push:
+    branches:
+      - build/v17-eas-20260714
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_ZIP: COLORJET_MANAGEMENT_SUITE_V17_0_MOBILE_SOURCE.zip
+  APP_VERSION: 1.7.1
+  ANDROID_VERSION_CODE: '1702'
+  EXPO_PROJECT_ID: affe8187-2811-4f17-9620-dbf8d542577a
+
+jobs:
+  validate:
+    name: Validate authoritative reference UI
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+
+      - name: Restore authoritative mobile source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf work
+          mkdir -p work
+          unzip -q "$SOURCE_ZIP" -d work
+          node v17-build/prepare-reference-ui-source.mjs work
+
+      - name: Install Expo SDK 54 dependencies
+        working-directory: work
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
+            npx expo install --fix --yarn
+            npx expo install --yarn \
+              @react-native-async-storage/async-storage \
+              expo-blur expo-font expo-haptics expo-image-picker expo-router \
+              expo-splash-screen expo-web-browser \
+              react-native-gesture-handler react-native-reanimated \
+              react-native-safe-area-context react-native-screens react-native-svg
+            yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
+          } > ../install.log 2>&1 || {
+            tail -n 120 ../install.log
+            exit 1
+          }
+
+      - name: Record TypeScript diagnostics without replacing working UI
+        working-directory: work
+        shell: bash
+        run: |
+          set +e
+          npx tsc --noEmit > ../typecheck.log 2>&1
+          STATUS=$?
+          if [ "$STATUS" -ne 0 ]; then
+            echo "Existing reference source has non-bundling TypeScript diagnostics; Metro export remains the release gate."
+            tail -n 80 ../typecheck.log
+          else
+            echo "TypeScript validation passed."
+          fi
+          exit 0
+
+      - name: Validate production identity and remove generic shell
+        working-directory: work
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx expo config --type public > expo-config.json
+          grep -q 'com.colorjetbd.managementsuite' expo-config.json
+          grep -Eq '"versionCode"[[:space:]]*:[[:space:]]*1702' expo-config.json
+          grep -Eq '"version"[[:space:]]*:[[:space:]]*"1.7.1"' expo-config.json
+          grep -q 'Good morning' "app/(tabs)/index.tsx"
+          grep -q 'Sales MTD' "app/(tabs)/index.tsx"
+          grep -q 'Business Management System' app/login.tsx
+          grep -q '#1A237E' constants/colors.ts
+          grep -q '#F57C00' constants/colors.ts
+          ! grep -R --line-number --fixed-strings 'https://replit.com/' app app.json components constants context hooks lib
+          ! grep -R --line-number --fixed-strings 'colorjet-management-suite.replit.app' app app.json components constants context hooks lib
+          ! grep -R --line-number --fixed-strings 'First Owner Setup' app
+          ! grep -R --line-number --fixed-strings '/deliveries/new • /api/deliveries' app
+          ! grep -R --line-number --fixed-strings '/admin/push-notifications/new • /notifications/broadcast' app
+          ! grep -R --line-number --fixed-strings 'admin123' app components constants context hooks lib
+
+      - name: Bundle Android app with Metro
+        working-directory: work
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx expo export --platform android --output-dir dist-android --clear > ../metro-export.log 2>&1 || {
+            tail -n 180 ../metro-export.log
+            exit 1
+          }
+          test -d dist-android
+          find dist-android -type f | head -n 25
+
+      - name: Package corrected source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf source-release
+          mkdir -p source-release
+          rsync -a \
+            --exclude node_modules \
+            --exclude .expo \
+            --exclude dist-android \
+            --exclude .git \
+            --exclude credentials.json \
+            --exclude credentials/ \
+            work/ source-release/
+          cd source-release
+          zip -qr ../COLORJET_MANAGEMENT_SUITE_V17_1_REFERENCE_UI_SOURCE.zip .
+          cd ..
+          sha256sum COLORJET_MANAGEMENT_SUITE_V17_1_REFERENCE_UI_SOURCE.zip > COLORJET_MANAGEMENT_SUITE_V17_1_REFERENCE_UI_SOURCE.zip.sha256
+
+      - name: Upload corrected source
+        uses: actions/upload-artifact@v4
+        with:
+          name: COLORJET-V17-1-REFERENCE-UI-SOURCE-VALIDATED
+          path: |
+            COLORJET_MANAGEMENT_SUITE_V17_1_REFERENCE_UI_SOURCE.zip
+            COLORJET_MANAGEMENT_SUITE_V17_1_REFERENCE_UI_SOURCE.zip.sha256
+            work/app.json
+            work/package.json
+            work/yarn.lock
+            work/expo-config.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload validation diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: COLORJET-V17-1-REFERENCE-UI-VALIDATION-DIAGNOSTICS
+          path: |
+            install.log
+            typecheck.log
+            metro-export.log
+            work/app.json
+            work/package.json
+            work/tsconfig.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  signed-build:
+    name: Signed ${{ matrix.profile }} reference UI
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - profile: preview
+            filename: COLORJET_MANAGEMENT_SUITE_V17_1_REFERENCE_UI_SIGNED.apk
+            artifact: COLORJET-V17-1-REFERENCE-UI-SIGNED-APK
+          - profile: production
+            filename: COLORJET_MANAGEMENT_SUITE_V17_1_REFERENCE_UI_SIGNED.aab
+            artifact: COLORJET-V17-1-REFERENCE-UI-SIGNED-AAB
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+
+      - name: Restore authoritative mobile source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf work
+          mkdir -p work
+          unzip -q "$SOURCE_ZIP" -d work
+          node v17-build/prepare-reference-ui-source.mjs work
+
+      - name: Install Expo SDK 54 dependencies
+        working-directory: work
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
+            npx expo install --fix --yarn
+            npx expo install --yarn \
+              @react-native-async-storage/async-storage \
+              expo-blur expo-font expo-haptics expo-image-picker expo-router \
+              expo-splash-screen expo-web-browser \
+              react-native-gesture-handler react-native-reanimated \
+              react-native-safe-area-context react-native-screens react-native-svg
+            yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
+          } > ../install-${{ matrix.profile }}.log 2>&1 || {
+            tail -n 120 ../install-${{ matrix.profile }}.log
+            exit 1
+          }
+
+      - name: Configure original Android signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.COLORJET_ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.COLORJET_ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.COLORJET_ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.COLORJET_ANDROID_KEY_PASSWORD }}
+        run: bash v17-build/configure-eas-local-signing.sh work
+
+      - name: Initialize EAS snapshot
+        working-directory: work
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init --quiet
+          git config user.name 'COLORJET Build Bot'
+          git config user.email 'colorjet-build@users.noreply.github.com'
+          git add -A
+          git commit --quiet -m 'COLORJET V17.1 reference UI signed build' || true
+
+      - name: Verify Expo project
+        working-directory: work
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          npx --yes eas-cli@latest whoami
+          npx --yes eas-cli@latest project:info
+
+      - name: Build signed Android output
+        working-directory: work
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          NPM_CONFIG_LOGLEVEL: error
+          NPM_CONFIG_AUDIT: 'false'
+          NPM_CONFIG_FUND: 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes eas-cli@latest build \
+            --platform android \
+            --profile '${{ matrix.profile }}' \
+            --non-interactive \
+            --wait \
+            --json > 'eas-${{ matrix.profile }}.json' 2> 'eas-${{ matrix.profile }}.err'
+
+      - name: Download and verify signed output
+        working-directory: work
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_URL=$(jq -r 'if type == "array" then .[0].artifacts.buildUrl else .artifacts.buildUrl end' 'eas-${{ matrix.profile }}.json')
+          test -n "$BUILD_URL"
+          test "$BUILD_URL" != 'null'
+          curl --fail --location --retry 5 "$BUILD_URL" --output '${{ matrix.filename }}'
+          file '${{ matrix.filename }}'
+          sha256sum '${{ matrix.filename }}' > '${{ matrix.filename }}.sha256'
+
+      - name: Upload signed output
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            work/${{ matrix.filename }}
+            work/${{ matrix.filename }}.sha256
+            work/eas-${{ matrix.profile }}.json
+            work/app.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: COLORJET-V17-1-${{ matrix.profile }}-BUILD-DIAGNOSTICS
+          path: |
+            install-${{ matrix.profile }}.log
+            work/eas-${{ matrix.profile }}.json
+            work/eas-${{ matrix.profile }}.err
+            work/app.json
+            work/package.json
+            work/eas.json
+          if-no-files-found: warn
+          retention-days: 7
