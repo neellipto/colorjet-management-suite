@@ -24,6 +24,13 @@ function copyEntry(relativePath) {
 assert(fs.existsSync(sourceRoot), `Missing authoritative source: ${sourceRoot}`);
 assert(fs.existsSync(workRoot), `Missing SDK 54 build scaffold: ${workRoot}`);
 
+// EAS must see one package manager and one synchronized lockfile. The original
+// scaffold contained an npm lock beside Yarn configuration, which made the remote
+// install phase non-deterministic.
+for (const lockfile of ['package-lock.json', 'npm-shrinkwrap.json', 'pnpm-lock.yaml']) {
+  fs.rmSync(path.join(workRoot, lockfile), { force: true });
+}
+
 // Replace the generic V17 module shell with the original working mobile UI source.
 for (const entry of ['app', 'assets', 'components', 'constants', 'context', 'hooks', 'lib']) {
   copyEntry(entry);
@@ -132,7 +139,7 @@ const easPath = path.join(workRoot, 'eas.json');
 const eas = fs.existsSync(easPath)
   ? JSON.parse(fs.readFileSync(easPath, 'utf8'))
   : {};
-eas.cli = { ...(eas.cli || {}), version: '>= 12.0.0' };
+eas.cli = { ...(eas.cli || {}), version: '>= 12.0.0', appVersionSource: 'local' };
 eas.build = {
   ...(eas.build || {}),
   preview: {
