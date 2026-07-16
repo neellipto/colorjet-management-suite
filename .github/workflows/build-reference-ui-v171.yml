@@ -1,0 +1,209 @@
+name: Build COLORJET Reference UI V17.1
+
+on:
+  push:
+    branches:
+      - fix/reference-apk-ui-1702
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_DIR: artifacts/mobile
+  APP_VERSION: 1.7.1
+  ANDROID_VERSION_CODE: '1702'
+  ANDROID_PACKAGE: com.colorjetbd.managementsuite
+
+jobs:
+  verify-reference-source:
+    name: Verify reference APK matching source
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout correction branch
+        uses: actions/checkout@v4
+
+      - name: Verify immutable app identity and UI source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$SOURCE_DIR/app.json"
+          test -f "$SOURCE_DIR/package.json"
+          test -f "$SOURCE_DIR/app/_layout.tsx"
+          test -f "$SOURCE_DIR/app/(tabs)/index.tsx"
+          test -f "$SOURCE_DIR/constants/colors.ts"
+          test -f "$SOURCE_DIR/assets/images/icon.png"
+          test -f "$SOURCE_DIR/assets/images/splash.png"
+
+          node <<'NODE'
+          const fs = require('fs');
+          const app = JSON.parse(fs.readFileSync('artifacts/mobile/app.json', 'utf8')).expo;
+          const pkg = JSON.parse(fs.readFileSync('artifacts/mobile/package.json', 'utf8'));
+          const failures = [];
+          if (app.name !== 'COLORJET Management Suite') failures.push(`name=${app.name}`);
+          if (app.android?.package !== 'com.colorjetbd.managementsuite') failures.push(`package=${app.android?.package}`);
+          if (app.version !== '1.7.1') failures.push(`version=${app.version}`);
+          if (app.android?.versionCode !== 1702) failures.push(`versionCode=${app.android?.versionCode}`);
+          if (pkg.dependencies?.['@workspace/api-client-react']) failures.push('workspace dependency remains');
+          if (JSON.stringify(app).toLowerCase().includes('replit')) failures.push('Replit origin remains');
+          if (failures.length) throw new Error(failures.join('\n'));
+          console.log('Identity and Replit removal checks passed.');
+          NODE
+
+          ! grep -RInE --exclude-dir=node_modules --exclude='*.map' \
+            'First Owner Setup|/deliveries/new[[:space:]]*[•·]|/api/deliveries|/admin/push-notifications|@workspace/|replit\.com' \
+            "$SOURCE_DIR"
+
+          test ! -f "$SOURCE_DIR/app/operations/[module].tsx"
+          grep -q 'Sales MTD' "$SOURCE_DIR/app/(tabs)/index.tsx"
+          grep -q '#1A237E' "$SOURCE_DIR/constants/colors.ts"
+          grep -q '#F57C00' "$SOURCE_DIR/constants/colors.ts"
+          echo 'Reference UI verification passed.'
+
+  eas-build:
+    name: EAS ${{ matrix.profile }} — reference UI
+    needs: verify-reference-source
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - profile: preview
+            filename: COLORJET_MANAGEMENT_SUITE_REFERENCE_UI_V17_1_SIGNED.apk
+          - profile: production
+            filename: COLORJET_MANAGEMENT_SUITE_REFERENCE_UI_V17_1_SIGNED.aab
+
+    steps:
+      - name: Checkout correction branch
+        uses: actions/checkout@v4
+
+      - name: Copy authoritative reference UI source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work
+          cp -a "$SOURCE_DIR"/. work/
+
+      - name: Set up Node for Expo SDK 54
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.4'
+          cache: npm
+          cache-dependency-path: work/package.json
+
+      - name: Install and normalize Expo SDK 54 dependencies
+        working-directory: work
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f package-lock.json yarn.lock pnpm-lock.yaml
+          npm install --legacy-peer-deps --no-audit --no-fund
+          npx expo install --fix --npm
+          npx expo install --npm \
+            @react-native-community/datetimepicker \
+            @react-native-async-storage/async-storage \
+            expo-blur expo-font expo-haptics expo-image-picker expo-router expo-splash-screen expo-web-browser \
+            react-native-gesture-handler react-native-keyboard-controller react-native-reanimated \
+            react-native-safe-area-context react-native-screens react-native-svg
+          npm install --legacy-peer-deps --no-audit --no-fund \
+            @expo-google-fonts/inter @supabase/supabase-js @tanstack/react-query @babel/runtime
+          npx expo install --fix --npm
+          npx expo-doctor
+
+      - name: Verify production bundle has no generic debug shell
+        working-directory: work
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -RInE --exclude-dir=node_modules --exclude='*.map' \
+            'First Owner Setup|/deliveries/new[[:space:]]*[•·]|/api/deliveries|/admin/push-notifications|@workspace/|replit\.com' .
+          npm run typecheck
+          npx expo export --platform android --output-dir dist-smoke
+          ! grep -RInaE \
+            'First Owner Setup|/api/deliveries|/admin/push-notifications|replit\.com' dist-smoke
+
+      - name: Configure original COLORJET signing credentials
+        working-directory: work
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.COLORJET_ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.COLORJET_ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.COLORJET_ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.COLORJET_ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > colorjet-release.keystore
+          chmod 600 colorjet-release.keystore
+          node <<'NODE'
+          const fs = require('fs');
+          const credentials = {
+            android: {
+              keystore: {
+                keystorePath: 'colorjet-release.keystore',
+                keystorePassword: process.env.ANDROID_KEYSTORE_PASSWORD,
+                keyAlias: process.env.ANDROID_KEY_ALIAS,
+                keyPassword: process.env.ANDROID_KEY_PASSWORD,
+              },
+            },
+          };
+          fs.writeFileSync('credentials.json', JSON.stringify(credentials, null, 2) + '\n');
+          NODE
+
+      - name: Initialize isolated build snapshot
+        working-directory: work
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .git dist-smoke
+          git init --quiet
+          git config user.name 'COLORJET Build Bot'
+          git config user.email 'colorjet-build@users.noreply.github.com'
+          git add -A
+          git commit --quiet -m 'COLORJET reference UI V17.1 build snapshot'
+
+      - name: Queue and wait for signed EAS build
+        working-directory: work
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          NPM_CONFIG_AUDIT: 'false'
+          NPM_CONFIG_FUND: 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$EXPO_TOKEN"
+          npx --yes eas-cli@latest build \
+            --platform android \
+            --profile "${{ matrix.profile }}" \
+            --non-interactive \
+            --wait \
+            --json > "eas-${{ matrix.profile }}.json"
+
+      - name: Download signed output
+        working-directory: work
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_URL=$(jq -r 'if type == "array" then .[0].artifacts.buildUrl else .artifacts.buildUrl end' "eas-${{ matrix.profile }}.json")
+          test -n "$BUILD_URL"
+          test "$BUILD_URL" != 'null'
+          curl --fail --location --retry 5 "$BUILD_URL" --output "${{ matrix.filename }}"
+          sha256sum "${{ matrix.filename }}" > "${{ matrix.filename }}.sha256"
+
+      - name: Upload signed reference UI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: COLORJET-REFERENCE-UI-V17-1-${{ matrix.profile }}-SIGNED
+          path: |
+            work/${{ matrix.filename }}
+            work/${{ matrix.filename }}.sha256
+            work/eas-${{ matrix.profile }}.json
+            work/app.json
+            work/package.json
+          if-no-files-found: error
+          retention-days: 14
