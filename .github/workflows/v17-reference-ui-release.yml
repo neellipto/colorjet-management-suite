@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 env:
   SOURCE_ZIP: COLORJET_MANAGEMENT_SUITE_V17_0_MOBILE_SOURCE.zip
@@ -20,6 +21,28 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
+      - name: Publish final release run ID
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          {
+            echo 'COLORJET V17.1 final corrected-branch release.'
+            echo
+            echo "Run ID: $GITHUB_RUN_ID"
+            echo "Run URL: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "Event: $GITHUB_EVENT_NAME"
+            echo "Commit: $GITHUB_SHA"
+            echo "Branch: $GITHUB_REF_NAME"
+            echo 'Target: COLORJET Management Suite 1.7.1 / Android 1702 / com.colorjetbd.managementsuite'
+          } > release-status.md
+          ISSUE=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search 'COLORJET V17.1 Final Release Status in:title' --json number --jq '.[0].number // empty')
+          if [ -n "$ISSUE" ]; then
+            gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file release-status.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title 'COLORJET V17.1 Final Release Status' --body-file release-status.md
+          fi
+
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
