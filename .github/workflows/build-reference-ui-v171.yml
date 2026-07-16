@@ -93,27 +93,67 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20.19.4'
-          cache: npm
-          cache-dependency-path: work/package.json
 
-      - name: Install and normalize Expo SDK 54 dependencies
+      - name: Install clean Expo SDK 54 dependency graph
         working-directory: work
         shell: bash
         run: |
           set -euo pipefail
+          exec > >(tee ../dependency-install.log) 2>&1
           rm -f package-lock.json yarn.lock pnpm-lock.yaml
+
+          node <<'NODE'
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          pkg.name = 'colorjet-management-suite';
+          pkg.version = '1.7.1';
+          pkg.packageManager = 'npm@10.8.2';
+          pkg.dependencies = {
+            '@babel/runtime': '^7.26.0',
+            '@expo-google-fonts/inter': '^0.2.3',
+            '@opentelemetry/api': '^1.9.0',
+            '@supabase/supabase-js': '^2.57.0',
+            '@tanstack/react-query': '^5.28.6',
+            'expo': '~54.0.0',
+            'react': '19.1.0',
+            'react-dom': '19.1.0',
+            'react-native': '0.81.5',
+            'react-native-web': '~0.21.0'
+          };
+          pkg.devDependencies = {
+            '@babel/core': '^7.25.2',
+            '@types/node': '^22.10.1',
+            '@types/react': '~19.1.10',
+            'typescript': '~5.9.2'
+          };
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          NODE
+
           npm install --legacy-peer-deps --no-audit --no-fund
-          npx expo install --fix --npm
-          npx expo install --npm \
-            @react-native-community/datetimepicker \
+
+          npx expo install \
+            @expo/vector-icons \
             @react-native-async-storage/async-storage \
+            @react-native-community/datetimepicker \
             expo-blur expo-font expo-haptics expo-image-picker expo-router expo-splash-screen expo-web-browser \
             react-native-gesture-handler react-native-keyboard-controller react-native-reanimated \
             react-native-safe-area-context react-native-screens react-native-svg
-          npm install --legacy-peer-deps --no-audit --no-fund \
-            @expo-google-fonts/inter @supabase/supabase-js @tanstack/react-query @babel/runtime
-          npx expo install --fix --npm
+
+          npx expo install --fix
+          npm install --legacy-peer-deps --no-audit --no-fund
           npx expo-doctor
+
+      - name: Upload dependency diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: COLORJET-REFERENCE-UI-${{ matrix.profile }}-DEPENDENCY-DIAGNOSTICS
+          path: |
+            dependency-install.log
+            work/package.json
+            work/package-lock.json
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Verify production bundle has no generic debug shell
         working-directory: work
