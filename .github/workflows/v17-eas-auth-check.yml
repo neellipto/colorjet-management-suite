@@ -1,178 +1,31 @@
-name: Build COLORJET V17.1 Signed APK
+name: COLORJET V17.1 Reference UI Manual Check
 
 on:
-  push:
-    branches:
-      - build/v17-eas-20260714
   workflow_dispatch:
 
 permissions:
   contents: read
 
-env:
-  SOURCE_ZIP: COLORJET_MANAGEMENT_SUITE_V17_0_MOBILE_SOURCE.zip
-  APP_VERSION: 1.7.1
-  ANDROID_VERSION_CODE: '1702'
-
 jobs:
-  build-signed-apk:
+  verify-reference-ui:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
     steps:
-      - name: Checkout build branch
+      - name: Checkout reference UI branch
         uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22.16.0'
-
-      - name: Verify Expo token
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: |
-          test -n "$EXPO_TOKEN"
-          npx --yes eas-cli@latest whoami
-
-      - name: Extract authoritative V17 source
-        run: |
-          unzip -t "$SOURCE_ZIP" >/dev/null
-          mkdir -p work
-          unzip -q "$SOURCE_ZIP" -d work
-          test -f work/app.json
-          test -f work/eas.json
-          test -f work/package.json
-          test -f work/assets/images/colorjet-original-icon.webp
-
-      - name: Prepare V17.1 app identity and original COLORJET icon
-        working-directory: work
+      - name: Verify authoritative mobile UI source
         shell: bash
         run: |
-          node <<'NODE'
-          const fs = require('fs');
-          const source = './assets/images/colorjet-original-icon.webp';
-          const target = './assets/images/colorjet-original-icon.png';
-          const signature = Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]);
-          const bytes = fs.readFileSync(source);
-          if (!bytes.subarray(0, 8).equals(signature)) {
-            throw new Error('Original COLORJET icon is not valid PNG content.');
-          }
-          fs.copyFileSync(source, target);
-
-          const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
-          app.expo.name = 'COLORJET Management Suite';
-          app.expo.slug = 'colorjet-management-suite';
-          app.expo.version = process.env.APP_VERSION;
-          app.expo.icon = target;
-          app.expo.scheme = 'colorjet-erp';
-          app.expo.splash = {
-            ...(app.expo.splash || {}),
-            image: target,
-            resizeMode: 'contain',
-            backgroundColor: '#1A237E'
-          };
-          app.expo.android = {
-            ...(app.expo.android || {}),
-            package: 'com.colorjetbd.managementsuite',
-            versionCode: Number(process.env.ANDROID_VERSION_CODE),
-            adaptiveIcon: {
-              foregroundImage: target,
-              backgroundColor: '#1A237E'
-            }
-          };
-          app.expo.web = { ...(app.expo.web || {}), favicon: target };
-          app.expo.plugins = (app.expo.plugins || []).map((plugin) => {
-            if (Array.isArray(plugin) && plugin[0] === 'expo-splash-screen') {
-              return ['expo-splash-screen', {
-                ...(plugin[1] || {}),
-                image: target,
-                imageWidth: 180,
-                resizeMode: 'contain',
-                backgroundColor: '#1A237E'
-              }];
-            }
-            return plugin;
-          });
-          fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
-          console.log(`Prepared ${app.expo.name} ${app.expo.version} (${app.expo.android.versionCode})`);
-          NODE
-
-      - name: Install Expo dependencies
-        working-directory: work
-        shell: bash
-        run: |
-          yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
-          rm -f package-lock.json
-          node <<'NODE'
-          const fs = require('fs');
-          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          pkg.packageManager = 'yarn@1.22.22';
-          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-          NODE
-
-      - name: Configure original Android signing key
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.COLORJET_ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.COLORJET_ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.COLORJET_ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.COLORJET_ANDROID_KEY_PASSWORD }}
-        run: bash v17-build/configure-eas-local-signing.sh work
-
-      - name: Initialize build snapshot
-        working-directory: work
-        run: |
-          git init --quiet
-          git config user.name "COLORJET Build Bot"
-          git config user.email "colorjet-build@users.noreply.github.com"
-          git add -A
-          git commit --quiet -m "COLORJET V17.1 signed APK snapshot" || true
-
-      - name: Link Expo project
-        working-directory: work
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: npx --yes eas-cli@latest project:init --force --non-interactive
-
-      - name: Build signed APK on EAS
-        working-directory: work
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        shell: bash
-        run: |
-          npx --yes eas-cli@latest build --platform android --profile preview --non-interactive --wait --json > eas-preview.json 2> eas-preview.err
-
-      - name: Download and verify signed APK
-        working-directory: work
-        shell: bash
-        run: |
-          BUILD_URL=$(jq -r 'if type == "array" then .[0].artifacts.buildUrl else .artifacts.buildUrl end' eas-preview.json)
-          test -n "$BUILD_URL"
-          test "$BUILD_URL" != "null"
-          curl --fail --location --retry 5 "$BUILD_URL" --output COLORJET_MANAGEMENT_SUITE_V17_1_SIGNED.apk
-          file COLORJET_MANAGEMENT_SUITE_V17_1_SIGNED.apk
-          sha256sum COLORJET_MANAGEMENT_SUITE_V17_1_SIGNED.apk > COLORJET_MANAGEMENT_SUITE_V17_1_SIGNED.apk.sha256
-
-      - name: Upload signed APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: COLORJET-V17-1-SIGNED-APK
-          path: |
-            work/COLORJET_MANAGEMENT_SUITE_V17_1_SIGNED.apk
-            work/COLORJET_MANAGEMENT_SUITE_V17_1_SIGNED.apk.sha256
-            work/eas-preview.json
-            work/app.json
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload diagnostics on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: COLORJET-V17-1-APK-DIAGNOSTICS
-          path: |
-            work/eas-preview.json
-            work/eas-preview.err
-            work/app.json
-            work/eas.json
-          if-no-files-found: warn
-          retention-days: 7
+          set -euo pipefail
+          test -f artifacts/mobile/app/(tabs)/index.tsx
+          test -f artifacts/mobile/app/login.tsx
+          test -f artifacts/mobile/constants/colors.ts
+          test -f artifacts/mobile/context/AppContext.tsx
+          grep -q "#1A237E" artifacts/mobile/constants/colors.ts
+          grep -q "#F57C00" artifacts/mobile/constants/colors.ts
+          grep -q "Good morning" artifacts/mobile/app/(tabs)/index.tsx
+          grep -q "Sales MTD" artifacts/mobile/app/(tabs)/index.tsx
+          ! grep -R --line-number --fixed-strings "First Owner Setup" artifacts/mobile/app
+          ! grep -R --line-number --fixed-strings "/deliveries/new" artifacts/mobile/app
+          ! grep -R --line-number --fixed-strings "/admin/push-notifications/new" artifacts/mobile/app
+          echo "Authoritative COLORJET reference UI validation passed."
