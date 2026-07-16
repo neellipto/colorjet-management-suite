@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - build/v17-reference-ui-20260716
+      - build/v17-eas-20260714
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
