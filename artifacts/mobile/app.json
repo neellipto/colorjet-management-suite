@@ -1,36 +1,49 @@
 {
   "expo": {
-    "name": "COLORJET ERP",
-    "slug": "mobile",
-    "version": "1.0.0",
+    "name": "COLORJET Management Suite",
+    "slug": "colorjet-management-suite",
+    "version": "1.7.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "colorjet-erp",
     "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#1A237E"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.colorjetbd.managementsuite"
     },
-    "android": {},
+    "android": {
+      "package": "com.colorjetbd.managementsuite",
+      "versionCode": 1702,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#1A237E"
+      }
+    },
     "web": {
       "favicon": "./assets/images/favicon.png",
       "bundler": "metro"
     },
     "plugins": [
-      [
-        "expo-router",
-        {
-          "origin": "https://replit.com/"
-        }
-      ],
-      "expo-font"
+      "expo-router",
+      "expo-font",
+      "expo-web-browser",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
-      "typedRoutes": true
-    }
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "affe8187-2811-4f17-9620-dbf8d542577a"
+      }
+    },
+    "owner": "neellipto"
   }
 }
