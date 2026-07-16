@@ -57,20 +57,25 @@ jobs:
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Publish Metro diagnostic to draft PR
+      - name: Publish focused Metro diagnostic report
         if: steps.metro.outputs.status != '0'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           {
-            echo '### COLORJET V17.1 Metro diagnostic'
+            echo 'Automated diagnostic for COLORJET V17.1 reference UI build.'
             echo
             echo '```text'
             tail -n 120 metro-diagnostic.log
             echo '```'
-          } > metro-comment.md
-          gh pr comment 26 --repo "$GITHUB_REPOSITORY" --body-file metro-comment.md
+          } > metro-report.md
+          ISSUE=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search 'COLORJET V17.1 Metro Diagnostic Report in:title' --json number --jq '.[0].number // empty')
+          if [ -n "$ISSUE" ]; then
+            gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file metro-report.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title 'COLORJET V17.1 Metro Diagnostic Report' --body-file metro-report.md
+          fi
 
       - name: Confirm Metro result
         run: |
