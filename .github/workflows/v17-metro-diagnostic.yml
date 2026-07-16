@@ -3,6 +3,8 @@ name: COLORJET V17.1 Metro Diagnostic
 on:
   push:
     branches: [build/v17-eas-20260714]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
