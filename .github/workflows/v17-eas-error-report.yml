@@ -1,0 +1,52 @@
+name: COLORJET V17.1 EAS Error Report
+
+on:
+  push:
+    branches: [build/v17-eas-20260714]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+env:
+  FAILED_ARTIFACT_ID: '8389690238'
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download failed EAS diagnostic artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$FAILED_ARTIFACT_ID/zip" > eas-logs.zip
+          mkdir eas-logs
+          unzip -q eas-logs.zip -d eas-logs
+          find eas-logs -maxdepth 4 -type f -print
+
+      - name: Publish focused EAS error report
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          {
+            echo 'Automated diagnostics from the failed COLORJET V17.1 signed APK build.'
+            echo
+            for file in $(find eas-logs -type f \( -name '*.err' -o -name '*.json' -o -name '*.log' \) | sort); do
+              echo "## $file"
+              echo '```text'
+              tail -n 160 "$file"
+              echo '```'
+              echo
+            done
+          } > eas-error-report.md
+          ISSUE=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search 'COLORJET V17.1 EAS Build Error Report in:title' --json number --jq '.[0].number // empty')
+          if [ -n "$ISSUE" ]; then
+            gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file eas-error-report.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title 'COLORJET V17.1 EAS Build Error Report' --body-file eas-error-report.md
+          fi
