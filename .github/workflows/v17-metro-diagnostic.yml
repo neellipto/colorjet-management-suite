@@ -1,82 +1,13 @@
 name: COLORJET V17.1 Metro Diagnostic
 
 on:
-  push:
-    branches: [build/v17-eas-20260714]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
-
-env:
-  SOURCE_ZIP: COLORJET_MANAGEMENT_SUITE_V17_0_MOBILE_SOURCE.zip
-  APP_VERSION: 1.7.1
-  ANDROID_VERSION_CODE: '1702'
-  EXPO_PROJECT_ID: affe8187-2811-4f17-9620-dbf8d542577a
 
 jobs:
-  diagnose:
+  manual-only:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22.16.0'
-
-      - name: Prepare restored source
-        run: |
-          set -euo pipefail
-          rm -rf work
-          mkdir work
-          unzip -q "$SOURCE_ZIP" -d work
-          node v17-build/prepare-reference-ui-source.mjs work
-          node v17-build/validate-reference-ui.mjs work
-
-      - name: Install dependencies
-        working-directory: work
-        run: |
-          set -euo pipefail
-          yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
-          npx expo install --fix --yarn >/dev/null 2>&1
-          npx expo install --yarn @react-native-async-storage/async-storage expo-blur expo-font expo-haptics expo-image-picker expo-router expo-splash-screen expo-web-browser react-native-gesture-handler react-native-reanimated react-native-safe-area-context react-native-screens react-native-svg >/dev/null 2>&1
-          yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
-
-      - name: Run Metro export diagnostic
-        id: metro
-        working-directory: work
-        shell: bash
-        run: |
-          set +e
-          npx expo export --platform android --output-dir dist-android --clear > ../metro-diagnostic.log 2>&1
-          STATUS=$?
-          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
-          exit 0
-
-      - name: Publish focused Metro diagnostic report
-        if: steps.metro.outputs.status != '0'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          {
-            echo 'Automated diagnostic for COLORJET V17.1 reference UI build.'
-            echo
-            echo '```text'
-            tail -n 120 metro-diagnostic.log
-            echo '```'
-          } > metro-report.md
-          ISSUE=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search 'COLORJET V17.1 Metro Diagnostic Report in:title' --json number --jq '.[0].number // empty')
-          if [ -n "$ISSUE" ]; then
-            gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file metro-report.md
-          else
-            gh issue create --repo "$GITHUB_REPOSITORY" --title 'COLORJET V17.1 Metro Diagnostic Report' --body-file metro-report.md
-          fi
-
-      - name: Confirm Metro result
-        run: |
-          test '${{ steps.metro.outputs.status }}' = '0'
+      - run: echo "Metro validation already passes in the final reference UI release workflow."
