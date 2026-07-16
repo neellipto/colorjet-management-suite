@@ -3,8 +3,6 @@ name: Release COLORJET V17.1 Reference UI APK and AAB
 on:
   push:
     branches: [build/v17-eas-20260714]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -42,7 +40,7 @@ jobs:
           set -euo pipefail
           yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
           npx expo install --fix --yarn > ../expo-install.log 2>&1
-          npx expo install --yarn @react-native-async-storage/async-storage expo-blur expo-font expo-haptics expo-image-picker expo-router expo-splash-screen expo-web-browser react-native-gesture-handler react-native-reanimated react-native-safe-area-context react-native-screens react-native-svg >> ../expo-install.log 2>&1
+          npx expo install --yarn @react-native-async-storage/async-storage expo-blur expo-font expo-haptics expo-image-picker expo-router expo-splash-screen expo-web-browser react-native-gesture-handler react-native-reanimated react-native-worklets react-native-safe-area-context react-native-screens react-native-svg >> ../expo-install.log 2>&1
           yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
 
       - name: Validate normalized source
@@ -60,7 +58,7 @@ jobs:
           set -euo pipefail
           rm -rf release-source
           mkdir release-source
-          rsync -a --exclude node_modules --exclude .expo --exclude dist-android --exclude .git work/ release-source/
+          rsync -a --exclude node_modules --exclude .expo --exclude dist-android --exclude .git --exclude package-lock.json --exclude npm-shrinkwrap.json work/ release-source/
           cd release-source
           zip -qr ../COLORJET_MANAGEMENT_SUITE_V17_1_REFERENCE_UI_SOURCE_FINAL.zip .
           cd ..
@@ -130,7 +128,7 @@ jobs:
           set -euo pipefail
           yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
           npx expo install --fix --yarn > ../expo-install-${{ matrix.profile }}.log 2>&1
-          npx expo install --yarn @react-native-async-storage/async-storage expo-blur expo-font expo-haptics expo-image-picker expo-router expo-splash-screen expo-web-browser react-native-gesture-handler react-native-reanimated react-native-safe-area-context react-native-screens react-native-svg >> ../expo-install-${{ matrix.profile }}.log 2>&1
+          npx expo install --yarn @react-native-async-storage/async-storage expo-blur expo-font expo-haptics expo-image-picker expo-router expo-splash-screen expo-web-browser react-native-gesture-handler react-native-reanimated react-native-worklets react-native-safe-area-context react-native-screens react-native-svg >> ../expo-install-${{ matrix.profile }}.log 2>&1
           yarn install --silent --ignore-scripts --non-interactive --no-progress --network-timeout 600000
 
       - name: Validate build source
@@ -167,7 +165,11 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           set -euo pipefail
-          npx --yes eas-cli@latest build --platform android --profile '${{ matrix.profile }}' --non-interactive --wait --json > eas-${{ matrix.profile }}.json 2> eas-${{ matrix.profile }}.err
+          if ! npx --yes eas-cli@latest build --platform android --profile '${{ matrix.profile }}' --non-interactive --wait --json > eas-${{ matrix.profile }}.json 2> eas-${{ matrix.profile }}.err; then
+            cat eas-${{ matrix.profile }}.err
+            cat eas-${{ matrix.profile }}.json || true
+            exit 1
+          fi
 
       - name: Download signed file
         working-directory: work
