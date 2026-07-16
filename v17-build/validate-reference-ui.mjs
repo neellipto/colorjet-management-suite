@@ -10,6 +10,14 @@ const requireText = (file, values) => {
   }
 };
 
+// The restored reference source uses the Expo Babel preset. The SDK 54 scaffold
+// did not declare it directly, so make the dependency explicit before install.
+const packagePath = path.join(root, 'package.json');
+const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+pkg.devDependencies = { ...(pkg.devDependencies || {}) };
+pkg.devDependencies['babel-preset-expo'] ||= '~54.0.0';
+fs.writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`);
+
 const app = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'));
 if (app.expo?.name !== 'COLORJET Management Suite') fail('Incorrect app name.');
 if (app.expo?.version !== '1.7.1') fail('Incorrect app version.');
