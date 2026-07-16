@@ -12,12 +12,17 @@ permissions:
 
 env:
   FAILED_ARTIFACT_ID: '8389690238'
+  FAILED_EAS_BUILD_ID: e2fb71fc-2568-4b77-8d0c-1619a717bd16
 
 jobs:
   report:
     runs-on: ubuntu-latest
     steps:
-      - name: Download failed EAS diagnostic artifact
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+
+      - name: Download local CLI diagnostic artifact
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -28,6 +33,23 @@ jobs:
           unzip -q eas-logs.zip -d eas-logs
           find eas-logs -maxdepth 4 -type f -print
 
+      - name: Query EAS build metadata and remote logs
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes eas-cli@latest build:view "$FAILED_EAS_BUILD_ID" --json > eas-build-view.json 2> eas-build-view.err || true
+          mkdir -p eas-remote-logs
+          jq -r '.. | strings | select(test("^https://"))' eas-build-view.json 2>/dev/null | sort -u > eas-log-urls.txt || true
+          index=0
+          while IFS= read -r url; do
+            [ -n "$url" ] || continue
+            index=$((index + 1))
+            curl --fail --location --retry 3 "$url" -o "eas-remote-logs/log-$index.txt" || true
+          done < eas-log-urls.txt
+          find eas-remote-logs -type f -maxdepth 1 -print
+
       - name: Publish focused EAS error report
         env:
           GH_TOKEN: ${{ github.token }}
@@ -36,10 +58,11 @@ jobs:
           {
             echo 'Automated diagnostics from the failed COLORJET V17.1 signed APK build.'
             echo
-            for file in $(find eas-logs -type f \( -name '*.err' -o -name '*.json' -o -name '*.log' \) | sort); do
+            for file in eas-build-view.err eas-build-view.json eas-log-urls.txt $(find eas-logs eas-remote-logs -type f 2>/dev/null | sort); do
+              [ -f "$file" ] || continue
               echo "## $file"
               echo '```text'
-              tail -n 160 "$file"
+              tail -n 220 "$file"
               echo '```'
               echo
             done
