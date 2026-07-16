@@ -10,12 +10,14 @@ const requireText = (file, values) => {
   }
 };
 
-// The restored reference source uses the Expo Babel preset. The SDK 54 scaffold
-// did not declare it directly, so make the dependency explicit before install.
+// The restored reference source uses the Expo Babel preset and Reanimated.
+// Declare the SDK 54 Babel preset and required Worklets peer before install.
 const packagePath = path.join(root, 'package.json');
 const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+pkg.dependencies = { ...(pkg.dependencies || {}) };
 pkg.devDependencies = { ...(pkg.devDependencies || {}) };
 pkg.devDependencies['babel-preset-expo'] ||= '~54.0.0';
+pkg.dependencies['react-native-worklets'] ||= '0.5.1';
 fs.writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`);
 
 const app = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'));
