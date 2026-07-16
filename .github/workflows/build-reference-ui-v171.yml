@@ -135,9 +135,10 @@ jobs:
             @expo/vector-icons \
             @react-native-async-storage/async-storage \
             @react-native-community/datetimepicker \
-            expo-blur expo-font expo-haptics expo-image-picker expo-router expo-splash-screen expo-web-browser \
+            expo-blur expo-constants expo-font expo-haptics expo-image-picker expo-linking \
+            expo-router expo-splash-screen expo-web-browser \
             react-native-gesture-handler react-native-keyboard-controller react-native-reanimated \
-            react-native-safe-area-context react-native-screens react-native-svg
+            react-native-safe-area-context react-native-screens react-native-svg react-native-worklets
 
           npx expo install --fix
           npm install --legacy-peer-deps --no-audit --no-fund
