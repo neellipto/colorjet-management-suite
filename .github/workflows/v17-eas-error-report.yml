@@ -22,6 +22,15 @@ jobs:
         with:
           node-version: '22.16.0'
 
+      - name: Record corrected branch workflow runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs?branch=build%2Fv17-eas-20260714&per_page=50" > branch-runs-pages.json
+          jq -s '[.[].workflow_runs[]] | sort_by(.created_at) | reverse | map({id,name,event,status,conclusion,head_sha,run_number,created_at,updated_at,html_url}) | .[0:30]' branch-runs-pages.json > branch-runs.json
+
       - name: Download local CLI diagnostic artifact
         env:
           GH_TOKEN: ${{ github.token }}
@@ -50,13 +59,18 @@ jobs:
           done < eas-log-urls.txt
           find eas-remote-logs -type f -maxdepth 1 -print
 
-      - name: Publish focused EAS error report
+      - name: Publish focused EAS error and run report
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           {
-            echo 'Automated diagnostics from the failed COLORJET V17.1 signed APK build.'
+            echo 'Automated diagnostics and corrected-branch workflow tracking for COLORJET V17.1.'
+            echo
+            echo '## Latest corrected-branch workflow runs'
+            echo '```json'
+            cat branch-runs.json
+            echo '```'
             echo
             for file in eas-build-view.err eas-build-view.json eas-log-urls.txt $(find eas-logs eas-remote-logs -type f 2>/dev/null | sort); do
               [ -f "$file" ] || continue
