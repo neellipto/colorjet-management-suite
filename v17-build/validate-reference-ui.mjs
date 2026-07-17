@@ -39,6 +39,11 @@ for (const plugin of plugins) {
 requireText('app/login.tsx', ['COLORJET', 'Business Management System', 'Sign In']);
 requireText('app/(tabs)/index.tsx', ['Good morning', 'Sales MTD', 'Open Service Tickets', 'Service Control']);
 requireText('constants/colors.ts', ['#1A237E', '#F57C00', '#F0F2F5', '#FFFFFF', '#1C1C1E']);
+requireText('lib/runtimeConfig.ts', [
+  'https://x.ept.com.bd',
+  'EXPO_PUBLIC_APP_URL',
+  'EXPO_PUBLIC_AUTH_REDIRECT_URL',
+]);
 
 const sourceFiles = [];
 const collect = (dir) => {
@@ -55,6 +60,7 @@ const source = sourceFiles.map((file) => fs.readFileSync(file, 'utf8')).join('\n
 for (const forbidden of [
   'https://replit.com/',
   'colorjet-management-suite.replit.app',
+  'colorjet-management-suite-colorjet-pro.vercel.app',
   'First Owner Setup',
   '/deliveries/new • /api/deliveries',
   '/admin/push-notifications/new • /notifications/broadcast',
@@ -66,3 +72,4 @@ for (const forbidden of [
 console.log('COLORJET authoritative reference UI identity validation passed.');
 console.log('App: COLORJET Management Suite 1.7.1 (1702)');
 console.log('Package: com.colorjetbd.managementsuite');
+console.log('Production URL: https://x.ept.com.bd');
