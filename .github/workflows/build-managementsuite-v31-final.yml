@@ -1,15 +1,17 @@
-name: Build COLORJET Management Suite V3.1.1 Compiler Release
+name: Build COLORJET Management Suite V3.1.2 eng.erp.com.bd Integration
 
 on:
   push:
     branches: [managementsuite-v17-merged-build]
     paths:
       - 'build-source-v311/**'
+      - 'build-source-v312/**'
       - '.github/workflows/build-managementsuite-v31-final.yml'
   pull_request:
     branches: [main]
     paths:
       - 'build-source-v311/**'
+      - 'build-source-v312/**'
       - '.github/workflows/build-managementsuite-v31-final.yml'
   workflow_dispatch:
 
@@ -23,8 +25,9 @@ jobs:
     env:
       SOURCE_SHA256: cfd613ebc6d368ab10435d88f589473ce4702af637c87e19ccf5a679bdfa5ba3
       EXPECTED_PACKAGE: com.colorjetbd.managementsuite
-      EXPECTED_VERSION: 3.1.1
-      EXPECTED_VERSION_CODE: '3101'
+      EXPECTED_VERSION: 3.1.2
+      EXPECTED_VERSION_CODE: '3102'
+      EXPECTED_API_BASE: https://eng.erp.com.bd/api/v1
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,7 +40,7 @@ jobs:
           cache: gradle
       - uses: android-actions/setup-android@v3
 
-      - name: Reconstruct exact verified V3.1.1 source
+      - name: Reconstruct verified V3.1.1 base and apply V3.1.2 integration
         shell: bash
         run: |
           set -euo pipefail
@@ -53,27 +56,47 @@ jobs:
           gzip --test "$RUNNER_TEMP/COLORJET_V311_MERGED_SOURCE.tar.gz"
           tar -xzf "$RUNNER_TEMP/COLORJET_V311_MERGED_SOURCE.tar.gz" -C build/mobile
           cp -a build-source-v311/patches/. build/mobile/
+          chmod +x build-source-v312/apply-v312.sh
+          bash build-source-v312/apply-v312.sh build/mobile | tee build/output/V312_PATCH_VERIFY.log
           test -f build/mobile/package.json
           test -f build/mobile/app.json
           test -f build/mobile/src/core/moduleRegistry.ts
+          test -f build/mobile/src/services/moduleApi.ts
           test -f build/mobile/app/new/[key].tsx
-          cp "$RUNNER_TEMP/COLORJET_V311_MERGED_SOURCE.tar.gz" build/output/
+          tar -czf build/output/COLORJET_V312_ENG_API_SOURCE.tar.gz -C build/mobile .
 
-      - name: Verify app identity and protected icon path
+      - name: Verify app identity, API integration, routes and protected assets
         working-directory: build/mobile
         shell: bash
         run: |
-          node - <<'NODE'
+          set -euo pipefail
+          node - <<'NODE' | tee ../output/IDENTITY_API_VERIFY.log
           const fs = require('fs');
           const app = JSON.parse(fs.readFileSync('app.json', 'utf8')).expo;
           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const runtime = fs.readFileSync('src/services/runtimeConfig.ts', 'utf8');
+          const moduleApi = fs.readFileSync('src/services/moduleApi.ts', 'utf8');
+          const attendance = fs.readFileSync('src/attendance/attendanceSync.ts', 'utf8');
           if (app.android.package !== process.env.EXPECTED_PACKAGE) throw new Error(`Package mismatch: ${app.android.package}`);
           if (app.version !== process.env.EXPECTED_VERSION || pkg.version !== process.env.EXPECTED_VERSION) throw new Error('Version mismatch');
           if (String(app.android.versionCode) !== process.env.EXPECTED_VERSION_CODE) throw new Error(`versionCode mismatch: ${app.android.versionCode}`);
           if (app.icon !== './assets/images/colorjet-original-icon.webp') throw new Error('Original COLORJET icon path changed');
           if (!fs.existsSync('assets/images/colorjet-original-icon.webp')) throw new Error('Original COLORJET icon missing');
-          console.log(JSON.stringify({name: app.name, package: app.android.package, version: app.version, versionCode: app.android.versionCode, icon: app.icon}, null, 2));
+          if (!runtime.includes(process.env.EXPECTED_API_BASE)) throw new Error('eng.erp.com.bd API base missing');
+          if (!attendance.includes("apiPost('attendance'")) throw new Error('Attendance route mismatch');
+          if (moduleApi.includes("attendance/punch")) throw new Error('Legacy attendance route remains');
+          const routeCount = (moduleApi.match(/'[^']+': \{ list:/g) || []).length;
+          if (routeCount !== 38) throw new Error(`Expected 38 module routes, got ${routeCount}`);
+          console.log(JSON.stringify({name: app.name, package: app.android.package, version: app.version, versionCode: app.android.versionCode, icon: app.icon, apiBase: process.env.EXPECTED_API_BASE, moduleRoutes: routeCount}, null, 2));
           NODE
+          if grep -RInE --exclude-dir=node_modules --exclude='*.md' --exclude='.env.example' '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|DB_PASSWORD[[:space:]]*=[[:space:]]*[^[:space:]#]+|API_KEY[[:space:]]*=[[:space:]]*[^[:space:]#]+)' .; then
+            echo 'Potential embedded secret detected' >&2
+            exit 1
+          fi
+          if grep -RIn --exclude-dir=node_modules -E '<WebView|react-native-webview' app src package.json; then
+            echo 'WebView dependency or component detected' >&2
+            exit 1
+          fi
 
       - name: Install isolated dependencies
         working-directory: build/mobile
@@ -124,31 +147,34 @@ jobs:
           ACTUAL_CODE="$(apkanalyzer manifest version-code "$APK_SOURCE")"
           test "$ACTUAL_PACKAGE" = "$EXPECTED_PACKAGE"
           test "$ACTUAL_CODE" = "$EXPECTED_VERSION_CODE"
-          cp "$APK_SOURCE" ../output/COLORJET-Management-Suite-V3.1.1-COMPILER-TEST.apk
-          cp "$AAB_SOURCE" ../output/COLORJET-Management-Suite-V3.1.1-COMPILER-TEST.aab
+          cp "$APK_SOURCE" ../output/COLORJET-Management-Suite-V3.1.2-ENG-API-INTEGRATION-TEST.apk
+          cp "$AAB_SOURCE" ../output/COLORJET-Management-Suite-V3.1.2-ENG-API-INTEGRATION-TEST.aab
           apkanalyzer manifest print "$APK_SOURCE" > ../output/ANDROID_MANIFEST.txt
           cat > ../output/BUILD_INFO.txt <<'EOF'
-          COLORJET Management Suite V3.1.1 — Compiler Test Build
+          COLORJET Management Suite V3.1.2 — eng.erp.com.bd Integration Test
           Package: com.colorjetbd.managementsuite
-          Version: 3.1.1
-          Version Code: 3101
-          Source: V16 locked UI merged with V3 cPanel API/security layer
+          Version: 3.1.2
+          Version Code: 3102
+          Default API Base: https://eng.erp.com.bd/api/v1
+          Module API routes: 38 explicit V17.2 mappings
+          Attendance route: /attendance
+          Source: Verified V3.1.1 native source plus V3.1.2 API integration patch
           WebView: No
           Original COLORJET icon path: Preserved
           Embedded production password/secret: Not added
-          Build type: Non-production compiler verification
+          Build type: Non-production integration/compiler verification
           Production signing/upload key: Not used or replaced
           Play Store update compatibility: Not claimed until signed with the existing production key and checked against the current Play Console versionCode
-          Live cPanel login/API: Not tested by CI
+          Live eng.erp.com.bd login/API: Not tested by CI
           Physical Android device: Not tested by CI
           EOF
-          (cd ../output && sha256sum COLORJET-* COLORJET_V311_MERGED_SOURCE.tar.gz ANDROID_MANIFEST.txt BUILD_INFO.txt > SHA256SUMS.txt)
+          (cd ../output && sha256sum COLORJET-* ANDROID_MANIFEST.txt BUILD_INFO.txt *.log > SHA256SUMS.txt)
 
       - name: Upload build evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: COLORJET-MANAGEMENT-SUITE-V3.1.1-BUILD-EVIDENCE
+          name: COLORJET-MANAGEMENT-SUITE-V3.1.2-ENG-API-BUILD-EVIDENCE
           path: build/output/*
           if-no-files-found: error
           retention-days: 14
