@@ -2,7 +2,7 @@
 set -euo pipefail
 
 LIVE_ROOT="${LIVE_ROOT:-/home/neellipto/public_html/colorjet.website}"
-WORK_ROOT="${WORK_ROOT:-/home/neellipto/source-sync/colorjet-management-suite}"
+WORK_ROOT="${WORK_ROOT:-/home/neellipto/source-sync/colorjet-management-suite-onboarding}"
 REPO_SSH="${REPO_SSH:-git@github.com:neellipto/colorjet-management-suite.git}"
 BRANCH="${BRANCH:-rebuild/erp-v20-foundation}"
 TARGET_SUBDIR="apps/web-erp"
@@ -15,9 +15,16 @@ fi
 command -v git >/dev/null || { echo "ERROR: git is required" >&2; exit 1; }
 command -v rsync >/dev/null || { echo "ERROR: rsync is required" >&2; exit 1; }
 
+SCRIPT_PATH="$(readlink -f "$0")"
+if [[ "$SCRIPT_PATH" == "$WORK_ROOT"/* ]]; then
+  echo "ERROR: Run this script from a different folder than WORK_ROOT." >&2
+  exit 1
+fi
+
 rm -rf "$WORK_ROOT"
 mkdir -p "$(dirname "$WORK_ROOT")"
-git clone --branch "$BRANCH" --single-branch "$REPO_SSH" "$WORK_ROOT"
+GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh -i /home/neellipto/.ssh/neellipto_gpts -o IdentitiesOnly=yes}" \
+  git clone --branch "$BRANCH" --single-branch "$REPO_SSH" "$WORK_ROOT"
 mkdir -p "$WORK_ROOT/$TARGET_SUBDIR"
 
 rsync -a --delete \
@@ -56,7 +63,8 @@ if git diff --cached --quiet; then
 fi
 
 git commit -m "chore: onboard current Webuzo PHP ERP source"
-git push origin "$BRANCH"
+GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh -i /home/neellipto/.ssh/neellipto_gpts -o IdentitiesOnly=yes}" \
+  git push origin "$BRANCH"
 
 echo "Source onboarding completed on branch: $BRANCH"
 echo "Live files were copied only; the live document root was not modified."
