@@ -13,16 +13,57 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-apt-get update
-apt-get install -y git openssh-client rsync curl ca-certificates
+install_system_packages() {
+  if command -v dnf >/dev/null 2>&1; then
+    dnf -y install git openssh-clients rsync curl ca-certificates tar gzip findutils
+    PACKAGE_MANAGER="dnf"
+  elif command -v yum >/dev/null 2>&1; then
+    yum -y install git openssh-clients rsync curl ca-certificates tar gzip findutils
+    PACKAGE_MANAGER="yum"
+  elif command -v apt-get >/dev/null 2>&1; then
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y git openssh-client rsync curl ca-certificates tar gzip findutils
+    PACKAGE_MANAGER="apt"
+  else
+    echo "Unsupported Linux distribution: dnf, yum or apt-get was not found."
+    exit 1
+  fi
+}
 
-if ! command -v node >/dev/null 2>&1; then
-  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-  apt-get install -y nodejs
-fi
+install_node() {
+  local node_major=0
+  if command -v node >/dev/null 2>&1; then
+    node_major="$(node -p 'Number(process.versions.node.split(".")[0])' 2>/dev/null || echo 0)"
+  fi
 
-corepack enable
-corepack prepare pnpm@9 --activate
+  if [[ "$node_major" -lt 20 ]]; then
+    if [[ "$PACKAGE_MANAGER" == "apt" ]]; then
+      curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+      DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
+    else
+      curl -fsSL https://rpm.nodesource.com/setup_22.x | bash -
+      if [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+        dnf -y install nodejs
+      else
+        yum -y install nodejs
+      fi
+    fi
+  fi
+
+  node --version
+  npm --version
+
+  if command -v corepack >/dev/null 2>&1; then
+    corepack enable
+    corepack prepare pnpm@9 --activate
+  else
+    npm install -g pnpm@9
+  fi
+  pnpm --version
+}
+
+install_system_packages
+install_node
 
 mkdir -p "$(dirname "$APP_DIR")"
 if [[ ! -d "$APP_DIR/.git" ]]; then
