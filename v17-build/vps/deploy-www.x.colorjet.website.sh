@@ -3,9 +3,10 @@ set -euo pipefail
 
 REPO_URL="${REPO_URL:-git@github.com:neellipto/colorjet-management-suite.git}"
 BRANCH="${BRANCH:-build/v17-eas-20260714}"
-APP_DIR="${APP_DIR:-/opt/colorjet-management-suite}"
-WEB_ROOT="${WEB_ROOT:-/var/www/colorjet-management-suite}"
-NGINX_SITE="/etc/nginx/sites-available/www.x.colorjet.website"
+APP_DIR="${APP_DIR:-/home/neellipto/apps/colorjet-management-suite}"
+WEB_ROOT="${WEB_ROOT:-/home/neellipto/public_html/x/x.colorjet.website}"
+WEB_USER="${WEB_USER:-neellipto}"
+WEB_GROUP="${WEB_GROUP:-neellipto}"
 
 if [[ $EUID -ne 0 ]]; then
   echo "Run this script as root: sudo bash $0"
@@ -13,7 +14,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 apt-get update
-apt-get install -y git openssh-client nginx rsync curl ca-certificates certbot python3-certbot-nginx
+apt-get install -y git openssh-client rsync curl ca-certificates
 
 if ! command -v node >/dev/null 2>&1; then
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
@@ -23,10 +24,11 @@ fi
 corepack enable
 corepack prepare pnpm@9 --activate
 
+mkdir -p "$(dirname "$APP_DIR")"
 if [[ ! -d "$APP_DIR/.git" ]]; then
   if ! git ls-remote "$REPO_URL" HEAD >/dev/null 2>&1; then
     echo "Private GitHub repository access is not configured on this VPS."
-    echo "Add a GitHub SSH deploy key, then run this script again."
+    echo "Add a read-only GitHub SSH deploy key, then run this script again."
     exit 1
   fi
   rm -rf "$APP_DIR"
@@ -43,18 +45,13 @@ pnpm --filter @workspace/mobile run build
 
 test -f artifacts/mobile/static-build/index.html
 mkdir -p "$WEB_ROOT"
-rsync -a --delete artifacts/mobile/static-build/ "$WEB_ROOT"/
-chown -R www-data:www-data "$WEB_ROOT"
+rsync -a --delete --exclude='.htaccess' artifacts/mobile/static-build/ "$WEB_ROOT"/
+install -m 0644 v17-build/webuzo/.htaccess "$WEB_ROOT/.htaccess"
+chown -R "$WEB_USER:$WEB_GROUP" "$WEB_ROOT"
 find "$WEB_ROOT" -type d -exec chmod 755 {} \;
 find "$WEB_ROOT" -type f -exec chmod 644 {} \;
 
-cp v17-build/vps/nginx-www.x.colorjet.website.conf "$NGINX_SITE"
-ln -sfn "$NGINX_SITE" /etc/nginx/sites-enabled/www.x.colorjet.website
-rm -f /etc/nginx/sites-enabled/default
-nginx -t
-systemctl enable --now nginx
-systemctl reload nginx
-
-echo "Deployment complete: http://www.x.colorjet.website"
-echo "After the DNS A record resolves, enable HTTPS with:"
-echo "certbot --nginx -d www.x.colorjet.website --redirect"
+echo "Webuzo deployment complete: $WEB_ROOT"
+echo "Canonical URL: https://www.x.colorjet.website"
+echo "Webuzo must map both x.colorjet.website and www.x.colorjet.website to this same document root."
+echo "After DNS resolves, issue SSL for both names and enable Force HTTPS in Webuzo."
