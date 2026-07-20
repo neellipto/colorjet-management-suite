@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_URL="https://github.com/neellipto/colorjet-management-suite.git"
-BRANCH="build/v17-eas-20260714"
-APP_DIR="/opt/colorjet-management-suite"
-WEB_ROOT="/var/www/colorjet-management-suite"
+REPO_URL="${REPO_URL:-git@github.com:neellipto/colorjet-management-suite.git}"
+BRANCH="${BRANCH:-build/v17-eas-20260714}"
+APP_DIR="${APP_DIR:-/opt/colorjet-management-suite}"
+WEB_ROOT="${WEB_ROOT:-/var/www/colorjet-management-suite}"
 NGINX_SITE="/etc/nginx/sites-available/www.x.colorjet.website"
 
 if [[ $EUID -ne 0 ]]; then
@@ -13,7 +13,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 apt-get update
-apt-get install -y git nginx rsync curl ca-certificates
+apt-get install -y git openssh-client nginx rsync curl ca-certificates certbot python3-certbot-nginx
 
 if ! command -v node >/dev/null 2>&1; then
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
@@ -21,9 +21,14 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 
 corepack enable
-corepack prepare pnpm@latest --activate
+corepack prepare pnpm@9 --activate
 
 if [[ ! -d "$APP_DIR/.git" ]]; then
+  if ! git ls-remote "$REPO_URL" HEAD >/dev/null 2>&1; then
+    echo "Private GitHub repository access is not configured on this VPS."
+    echo "Add a GitHub SSH deploy key, then run this script again."
+    exit 1
+  fi
   rm -rf "$APP_DIR"
   git clone --branch "$BRANCH" --single-branch "$REPO_URL" "$APP_DIR"
 else
@@ -51,4 +56,5 @@ systemctl enable --now nginx
 systemctl reload nginx
 
 echo "Deployment complete: http://www.x.colorjet.website"
-echo "After DNS resolves, run: certbot --nginx -d www.x.colorjet.website"
+echo "After the DNS A record resolves, enable HTTPS with:"
+echo "certbot --nginx -d www.x.colorjet.website --redirect"
