@@ -1,6 +1,6 @@
 // Public production endpoints for the COLORJET Management Suite.
 // Authentication and business data remain protected by Supabase Auth + Row Level Security.
-const fallbackPublicAppUrl = 'https://x.ept.com.bd';
+const fallbackPublicAppUrl = 'https://www.x.colorjet.website';
 const fallbackSupabaseUrl = 'https://ljcuhwcyeijfiwpbkdsn.supabase.co';
 const fallbackSupabasePublishableKey = 'sb_publishable_zBx0iAibiz8HyiemgX074A_UtiCkU43';
 
