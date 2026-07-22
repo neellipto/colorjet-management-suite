@@ -1,4 +1,4 @@
-name: Build COLORJET Native Android V11.4.2
+name: Build COLORJET Native Android V11.4.1
 
 on:
   pull_request:
@@ -55,7 +55,7 @@ jobs:
       - name: Upload Android build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: COLORJET-ERP-Native-V11.4.2-SIGNED-Android
+          name: COLORJET-ERP-Native-V11.4.1-SIGNED-Android
           path: |
             android-v11.3-native/app/build/outputs/apk/**/*.apk
             android-v11.3-native/app/build/outputs/bundle/**/*.aab

@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">COLORJET ERP</string>
     <string name="erp_base_url">https://erp.ept.com.bd</string>
-    <string name="dashboard_url">https://erp.ept.com.bd/mobile</string>
+    <string name="dashboard_url">https://erp.ept.com.bd/dashboard</string>
     <string name="attendance_url">https://erp.ept.com.bd/hr/attendance</string>
     <string name="notifications_url">https://erp.ept.com.bd/notifications</string>
     <string name="messages_url">https://erp.ept.com.bd/messages</string>
