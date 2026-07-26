@@ -1,0 +1,84 @@
+name: COLORJET Final Additive CI
+
+on:
+  push:
+    branches:
+      - agent/final-additive-update-1721
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: colorjet-final-additive-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-mobile-source:
+    name: Validate authoritative mobile source
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: artifacts/mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.4'
+          cache: npm
+          cache-dependency-path: artifacts/mobile/package-lock.json
+
+      - name: Verify locked application identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const app = JSON.parse(fs.readFileSync('app.json', 'utf8')).expo;
+          const failures = [];
+          if (app.name !== 'COLORJET Management Suite') failures.push(`name=${app.name}`);
+          if (app.android?.package !== 'com.colorjetbd.managementsuite') failures.push(`package=${app.android?.package}`);
+          if (!Number.isInteger(app.android?.versionCode)) failures.push('versionCode missing');
+          if (failures.length) throw new Error(failures.join('\n'));
+          console.log(`${app.name} ${app.version} (${app.android.versionCode}) ${app.android.package}`);
+          NODE
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: TypeScript check
+        run: npm run typecheck
+
+      - name: Expo configuration check
+        run: npx expo config --type public
+
+      - name: Android export smoke test
+        run: npx expo export --platform android --output-dir dist-smoke
+
+      - name: Verify production endpoint and prohibited strings
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -RIn "https://erp.colorjet.website/api/v1" lib
+          ! grep -RInE --exclude-dir=node_modules --exclude='*.map' 'replit\.com|bd\.com\.colorjet\.erp|com\.colorjetbd\.erp' .
+
+      - name: Upload smoke-build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: COLORJET-FINAL-ADDITIVE-CI-EVIDENCE
+          path: |
+            artifacts/mobile/dist-smoke
+            artifacts/mobile/app.json
+            artifacts/mobile/package.json
+          if-no-files-found: error
+          retention-days: 14
