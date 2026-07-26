@@ -49,6 +49,9 @@ function RootLayoutNav() {
       <Stack.Screen name="notifications" options={{ title: "Notifications", headerBackTitle: "Back" }} />
       <Stack.Screen name="schedule" options={{ title: "Engineer Schedule", headerBackTitle: "Back" }} />
       <Stack.Screen name="service-control" options={{ title: "Service Control", headerBackTitle: "Back" }} />
+      <Stack.Screen name="owner-command-center" options={{ title: "Owner Command Center", headerBackTitle: "Back" }} />
+      <Stack.Screen name="owner-ai" options={{ title: "Owner AI", headerBackTitle: "Back" }} />
+      <Stack.Screen name="manual-registers" options={{ title: "Manual Registers", headerBackTitle: "Back" }} />
       <Stack.Screen name="admin/company" options={{ title: "Company Profile", headerBackTitle: "Back" }} />
       <Stack.Screen name="admin/branding" options={{ title: "Branding", headerBackTitle: "Back" }} />
       <Stack.Screen name="admin/catalog" options={{ title: "Catalog & Categories", headerBackTitle: "Back" }} />
