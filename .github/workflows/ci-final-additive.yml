@@ -1,13 +1,358 @@
-name: COLORJET Final Additive CI
+name: COLORJET Android Additive Build 1.7.2
 
 on:
   push:
+    branches:
+      - agent/final-additive-update-1721
   pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+env:
+  SOURCE_DIR: artifacts/mobile
+  APP_NAME: COLORJET Management Suite
+  APP_VERSION: 1.7.2
+  ANDROID_VERSION_CODE: '1721'
+  ANDROID_PACKAGE: com.colorjetbd.managementsuite
+  EXPECTED_UPLOAD_SHA256: F6:2D:0C:16:EE:F0:64:35:70:79:28:D8:11:EE:D3:3A:03:AB:39:15:E5:25:B9:8C:51:1B:27:EE:AA:E2:E8:CB
+
 jobs:
-  smoke:
+  verify-source:
+    name: Verify additive source and immutable identity
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - run: echo "COLORJET CI started"
+      - name: Checkout additive branch
+        uses: actions/checkout@v4
+
+      - name: Verify required source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            "$SOURCE_DIR/app.json"
+            "$SOURCE_DIR/eas.json"
+            "$SOURCE_DIR/package.json"
+            "$SOURCE_DIR/app/_layout.tsx"
+            "$SOURCE_DIR/app/login.tsx"
+            "$SOURCE_DIR/app/(tabs)/index.tsx"
+            "$SOURCE_DIR/context/AppContext.tsx"
+            "$SOURCE_DIR/context/ErpRuntimeContext.tsx"
+            "$SOURCE_DIR/lib/erpApi.ts"
+            "$SOURCE_DIR/lib/offlineSyncQueue.ts"
+            "$SOURCE_DIR/lib/effectivePermissions.ts"
+            "$SOURCE_DIR/assets/images/icon.png"
+            "$SOURCE_DIR/assets/images/splash.png"
+          )
+          for file in "${required[@]}"; do
+            test -f "$file" || { echo "Missing required file: $file"; exit 1; }
+          done
+
+      - name: Lock package, version and EAS identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const app = JSON.parse(fs.readFileSync('artifacts/mobile/app.json', 'utf8')).expo;
+          const eas = JSON.parse(fs.readFileSync('artifacts/mobile/eas.json', 'utf8'));
+          const pkg = JSON.parse(fs.readFileSync('artifacts/mobile/package.json', 'utf8'));
+          const failures = [];
+
+          if (app.name !== process.env.APP_NAME) failures.push(`app name: ${app.name}`);
+          if (app.android?.package !== process.env.ANDROID_PACKAGE) failures.push(`package: ${app.android?.package}`);
+          if (app.version !== process.env.APP_VERSION) failures.push(`version: ${app.version}`);
+          if (String(app.android?.versionCode) !== process.env.ANDROID_VERSION_CODE) failures.push(`versionCode: ${app.android?.versionCode}`);
+          if (pkg.version !== process.env.APP_VERSION) failures.push(`package.json version: ${pkg.version}`);
+          if (!app.extra?.eas?.projectId) failures.push('EAS projectId is missing');
+          if (eas.build?.preview?.android?.credentialsSource !== 'local') failures.push('preview credentialsSource must be local');
+          if (eas.build?.production?.android?.credentialsSource !== 'local') failures.push('production credentialsSource must be local');
+          if (eas.build?.preview?.android?.buildType !== 'apk') failures.push('preview must build APK');
+          if (eas.build?.production?.android?.buildType !== 'app-bundle') failures.push('production must build AAB');
+
+          if (failures.length) {
+            console.error(failures.join('\n'));
+            process.exit(1);
+          }
+          console.log(`Identity verified: ${app.android.package} ${app.version} (${app.android.versionCode})`);
+          NODE
+
+      - name: Verify protected implementation exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "expo-secure-store" "$SOURCE_DIR/package.json"
+          grep -q "SecureStore" "$SOURCE_DIR/lib/erpApi.ts"
+          grep -q "migrateLegacySession" "$SOURCE_DIR/lib/erpApi.ts"
+          grep -q "Idempotency-Key" "$SOURCE_DIR/lib/erpApi.ts"
+          grep -q "Owner Command Center" "$SOURCE_DIR/app/owner-command-center.tsx"
+          grep -q "Owner AI" "$SOURCE_DIR/app/owner-ai.tsx"
+          grep -q "Manual Register" "$SOURCE_DIR/app/manual-registers.tsx"
+          grep -q "conflict" "$SOURCE_DIR/lib/offlineSyncQueue.ts"
+          grep -q "permissionVersion" "$SOURCE_DIR/context/ErpRuntimeContext.tsx"
+
+      - name: Block committed secrets and signing material
+        shell: bash
+        run: |
+          set -euo pipefail
+          if find "$SOURCE_DIR" -type f \( -name '*.jks' -o -name '*.keystore' -o -name '*.p12' -o -name '*.pem' \) -print -quit | grep -q .; then
+            echo 'Signing/private-key material must not be committed.'
+            exit 1
+          fi
+          if grep -RIlE --exclude-dir=node_modules --exclude='*.lock' \
+            'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|service_account.*private_key|keystorePassword[[:space:]]*:[[:space:]]*["'"'][^$]' \
+            "$SOURCE_DIR" | grep -q .; then
+            echo 'Potential embedded secret detected.'
+            exit 1
+          fi
+
+      - name: Create source verification report
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p verification
+          {
+            echo "app_name=$APP_NAME"
+            echo "package=$ANDROID_PACKAGE"
+            echo "version=$APP_VERSION"
+            echo "version_code=$ANDROID_VERSION_CODE"
+            echo "expected_upload_sha256=$EXPECTED_UPLOAD_SHA256"
+            echo "commit=$GITHUB_SHA"
+            echo "verified_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > verification/SOURCE_IDENTITY.txt
+          sha256sum \
+            "$SOURCE_DIR/app.json" \
+            "$SOURCE_DIR/package.json" \
+            "$SOURCE_DIR/lib/erpApi.ts" \
+            > verification/SOURCE_SHA256SUMS.txt
+
+      - name: Upload source verification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: COLORJET-V17-2-SOURCE-VERIFICATION
+          path: verification/
+          if-no-files-found: error
+          retention-days: 30
+
+  signed-build:
+    name: Signed ${{ matrix.kind }} build
+    needs: verify-source
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - kind: APK
+            profile: preview
+            extension: apk
+            output: COLORJET_MANAGEMENT_SUITE_V17_2_BUILD_1721_SIGNED.apk
+          - kind: AAB
+            profile: production
+            extension: aab
+            output: COLORJET_MANAGEMENT_SUITE_V17_2_BUILD_1721_SIGNED.aab
+
+    steps:
+      - name: Checkout additive branch
+        uses: actions/checkout@v4
+
+      - name: Copy isolated source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf work
+          mkdir -p work
+          cp -a "$SOURCE_DIR"/. work/
+
+      - name: Set up Node 20.19.4
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.4'
+
+      - name: Install and align Expo SDK 54 dependencies
+        working-directory: work
+        shell: bash
+        run: |
+          set -euo pipefail
+          exec > >(tee ../dependency-install-${{ matrix.profile }}.log) 2>&1
+          rm -f package-lock.json yarn.lock pnpm-lock.yaml
+          npm install --legacy-peer-deps --no-audit --no-fund
+          npx expo install \
+            @expo/vector-icons \
+            @react-native-async-storage/async-storage \
+            @react-native-community/datetimepicker \
+            expo-blur expo-constants expo-font expo-haptics expo-image-picker expo-linking \
+            expo-router expo-secure-store expo-splash-screen expo-web-browser \
+            react-native-gesture-handler react-native-keyboard-controller react-native-reanimated \
+            react-native-safe-area-context react-native-screens react-native-svg react-native-worklets
+          npx expo install --fix
+          npm install --legacy-peer-deps --no-audit --no-fund
+          npx expo-doctor
+
+      - name: TypeScript and Android bundle validation
+        working-directory: work
+        shell: bash
+        env:
+          EXPO_PUBLIC_ERP_API_BASE_URL: https://erp.colorjet.website/api/v1
+        run: |
+          set -euo pipefail
+          npm run typecheck
+          npx expo config --type public > ../expo-config-${{ matrix.profile }}.json
+          npx expo export --platform android --output-dir dist-android
+          test -d dist-android
+          ! grep -RInaE 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ANDROID_KEYSTORE_PASSWORD|COLORJET_ANDROID_KEYSTORE_BASE64' dist-android
+
+      - name: Restore existing production upload key
+        working-directory: work
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.COLORJET_ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.COLORJET_ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.COLORJET_ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.COLORJET_ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > colorjet-release.keystore
+          chmod 600 colorjet-release.keystore
+
+          ACTUAL_SHA256=$(keytool -list -v \
+            -keystore colorjet-release.keystore \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+            -alias "$ANDROID_KEY_ALIAS" \
+            -keypass "$ANDROID_KEY_PASSWORD" 2>/dev/null \
+            | sed -nE 's/^[[:space:]]*SHA256:[[:space:]]*//p' | head -n1 | tr '[:lower:]' '[:upper:]')
+
+          test -n "$ACTUAL_SHA256"
+          if [ "$ACTUAL_SHA256" != "$EXPECTED_UPLOAD_SHA256" ]; then
+            echo "Upload certificate mismatch"
+            echo "Expected: $EXPECTED_UPLOAD_SHA256"
+            echo "Actual:   $ACTUAL_SHA256"
+            exit 1
+          fi
+
+          node <<'NODE'
+          const fs = require('fs');
+          const credentials = {
+            android: {
+              keystore: {
+                keystorePath: 'colorjet-release.keystore',
+                keystorePassword: process.env.ANDROID_KEYSTORE_PASSWORD,
+                keyAlias: process.env.ANDROID_KEY_ALIAS,
+                keyPassword: process.env.ANDROID_KEY_PASSWORD,
+              },
+            },
+          };
+          fs.writeFileSync('credentials.json', JSON.stringify(credentials, null, 2) + '\n');
+          NODE
+
+          printf '%s\n' "$ACTUAL_SHA256" > ../verified-upload-certificate-${{ matrix.profile }}.txt
+
+      - name: Initialize isolated EAS build snapshot
+        working-directory: work
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .git dist-android
+          git init --quiet
+          git config user.name 'COLORJET Build Bot'
+          git config user.email 'colorjet-build@users.noreply.github.com'
+          git add -A
+          git commit --quiet -m 'COLORJET Management Suite 1.7.2 build 1721'
+
+      - name: Build signed ${{ matrix.kind }} with EAS
+        working-directory: work
+        shell: bash
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_PUBLIC_ERP_API_BASE_URL: https://erp.colorjet.website/api/v1
+          NPM_CONFIG_AUDIT: 'false'
+          NPM_CONFIG_FUND: 'false'
+        run: |
+          set -euo pipefail
+          test -n "$EXPO_TOKEN"
+          npx --yes eas-cli@latest build \
+            --platform android \
+            --profile "${{ matrix.profile }}" \
+            --non-interactive \
+            --wait \
+            --json > "eas-${{ matrix.profile }}.json"
+
+      - name: Download signed output
+        working-directory: work
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_URL=$(jq -r 'if type == "array" then .[0].artifacts.buildUrl else .artifacts.buildUrl end' "eas-${{ matrix.profile }}.json")
+          test -n "$BUILD_URL"
+          test "$BUILD_URL" != 'null'
+          curl --fail --location --retry 5 --retry-delay 5 \
+            "$BUILD_URL" --output "${{ matrix.output }}"
+          test -s "${{ matrix.output }}"
+          sha256sum "${{ matrix.output }}" > "${{ matrix.output }}.sha256"
+
+      - name: Verify downloaded signer and artifact
+        working-directory: work
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUTPUT="${{ matrix.output }}"
+          if [ "${{ matrix.extension }}" = "aab" ]; then
+            jarsigner -verify -strict -certs "$OUTPUT"
+            ACTUAL_SHA256=$(keytool -printcert -jarfile "$OUTPUT" \
+              | sed -nE 's/^[[:space:]]*SHA256:[[:space:]]*//p' | head -n1 | tr '[:lower:]' '[:upper:]')
+          else
+            BUILD_TOOLS=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n1)
+            test -x "$BUILD_TOOLS/apksigner"
+            "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$OUTPUT" > apk-signature.txt
+            ACTUAL_SHA256=$(sed -nE 's/^Signer #[0-9]+ certificate SHA-256 digest:[[:space:]]*//p' apk-signature.txt | head -n1 | tr '[:lower:]' '[:upper:]')
+          fi
+
+          test -n "$ACTUAL_SHA256"
+          if [ "$ACTUAL_SHA256" != "$EXPECTED_UPLOAD_SHA256" ]; then
+            echo "Built artifact signer mismatch"
+            echo "Expected: $EXPECTED_UPLOAD_SHA256"
+            echo "Actual:   $ACTUAL_SHA256"
+            exit 1
+          fi
+
+          {
+            echo "artifact=$OUTPUT"
+            echo "package=$ANDROID_PACKAGE"
+            echo "version=$APP_VERSION"
+            echo "version_code=$ANDROID_VERSION_CODE"
+            echo "signer_sha256=$ACTUAL_SHA256"
+            echo "commit=$GITHUB_SHA"
+            echo "verified_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > "${{ matrix.output }}.verification.txt"
+
+      - name: Remove temporary signing material
+        if: always()
+        working-directory: work
+        shell: bash
+        run: |
+          rm -f colorjet-release.keystore credentials.json
+
+      - name: Upload signed ${{ matrix.kind }} artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: COLORJET-MANAGEMENT-SUITE-V17-2-1721-${{ matrix.kind }}-SIGNED
+          path: |
+            work/${{ matrix.output }}
+            work/${{ matrix.output }}.sha256
+            work/${{ matrix.output }}.verification.txt
+            work/eas-${{ matrix.profile }}.json
+            verified-upload-certificate-${{ matrix.profile }}.txt
+            expo-config-${{ matrix.profile }}.json
+            dependency-install-${{ matrix.profile }}.log
+          if-no-files-found: error
+          retention-days: 30
