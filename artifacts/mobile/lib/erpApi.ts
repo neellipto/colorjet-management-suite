@@ -1,7 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
-const ACCESS_TOKEN_KEY = '@colorjet/erp-access-token';
-const REFRESH_TOKEN_KEY = '@colorjet/erp-refresh-token';
+const LEGACY_ACCESS_TOKEN_KEY = '@colorjet/erp-access-token';
+const LEGACY_REFRESH_TOKEN_KEY = '@colorjet/erp-refresh-token';
+const SECURE_ACCESS_TOKEN_KEY = 'colorjet.erp.access_token';
+const SECURE_REFRESH_TOKEN_KEY = 'colorjet.erp.refresh_token';
 const DEFAULT_TIMEOUT_MS = 20_000;
 
 export const ERP_API_BASE_URL = (
@@ -48,27 +52,81 @@ export class ErpApiError extends Error {
   }
 }
 
-export async function saveErpSession(session: ErpSession): Promise<void> {
-  await AsyncStorage.setItem(ACCESS_TOKEN_KEY, session.accessToken);
-  if (session.refreshToken) {
-    await AsyncStorage.setItem(REFRESH_TOKEN_KEY, session.refreshToken);
-  } else {
-    await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
+const secureStoreOptions = Platform.OS === 'ios'
+  ? { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK }
+  : undefined;
+
+async function readSecret(key: string): Promise<string | null> {
+  if (Platform.OS === 'web') return AsyncStorage.getItem(key);
+  return SecureStore.getItemAsync(key, secureStoreOptions);
+}
+
+async function writeSecret(key: string, value: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    await AsyncStorage.setItem(key, value);
+    return;
   }
+  await SecureStore.setItemAsync(key, value, secureStoreOptions);
+}
+
+async function deleteSecret(key: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    await AsyncStorage.removeItem(key);
+    return;
+  }
+  await SecureStore.deleteItemAsync(key, secureStoreOptions);
+}
+
+async function removeLegacySession(): Promise<void> {
+  await AsyncStorage.multiRemove([LEGACY_ACCESS_TOKEN_KEY, LEGACY_REFRESH_TOKEN_KEY]);
+}
+
+async function migrateLegacySession(): Promise<ErpSession | null> {
+  const values = await AsyncStorage.multiGet([
+    LEGACY_ACCESS_TOKEN_KEY,
+    LEGACY_REFRESH_TOKEN_KEY,
+  ]);
+  const accessToken = values[0]?.[1] ?? null;
+  const refreshToken = values[1]?.[1] ?? null;
+
+  if (!accessToken) return null;
+
+  const session: ErpSession = { accessToken, refreshToken };
+  await writeSecret(SECURE_ACCESS_TOKEN_KEY, accessToken);
+  if (refreshToken) await writeSecret(SECURE_REFRESH_TOKEN_KEY, refreshToken);
+  await removeLegacySession();
+  return session;
+}
+
+export async function saveErpSession(session: ErpSession): Promise<void> {
+  await writeSecret(SECURE_ACCESS_TOKEN_KEY, session.accessToken);
+  if (session.refreshToken) {
+    await writeSecret(SECURE_REFRESH_TOKEN_KEY, session.refreshToken);
+  } else {
+    await deleteSecret(SECURE_REFRESH_TOKEN_KEY);
+  }
+  await removeLegacySession();
 }
 
 export async function clearErpSession(): Promise<void> {
-  await AsyncStorage.multiRemove([ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY]);
+  await Promise.all([
+    deleteSecret(SECURE_ACCESS_TOKEN_KEY),
+    deleteSecret(SECURE_REFRESH_TOKEN_KEY),
+    removeLegacySession(),
+  ]);
 }
 
 export async function readErpSession(): Promise<ErpSession | null> {
-  const [accessToken, refreshToken] = await AsyncStorage.multiGet([
-    ACCESS_TOKEN_KEY,
-    REFRESH_TOKEN_KEY,
+  const [accessToken, refreshToken] = await Promise.all([
+    readSecret(SECURE_ACCESS_TOKEN_KEY),
+    readSecret(SECURE_REFRESH_TOKEN_KEY),
   ]);
-  const access = accessToken[1];
-  if (!access) return null;
-  return { accessToken: access, refreshToken: refreshToken[1] };
+
+  if (accessToken) return { accessToken, refreshToken };
+
+  // Preserve the currently installed app session during the additive update.
+  // Legacy AsyncStorage tokens are migrated once, then removed.
+  return migrateLegacySession();
 }
 
 function requestId(): string {
