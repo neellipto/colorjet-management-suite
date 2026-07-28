@@ -43,6 +43,7 @@ function RootLayoutNav() {
       <Stack.Screen name="ticket/report/[id]" options={{ title: "Service Report", headerBackTitle: "Back" }} />
       <Stack.Screen name="customer/[id]" options={{ title: "Customer", headerBackTitle: "Back" }} />
       <Stack.Screen name="reports" options={{ title: "Reports", headerBackTitle: "Back" }} />
+      <Stack.Screen name="report" options={{ title: "Report Detail", headerBackTitle: "Back" }} />
       <Stack.Screen name="expenses" options={{ title: "Expenses", headerBackTitle: "Back" }} />
       <Stack.Screen name="delivery" options={{ title: "Deliveries", headerBackTitle: "Back" }} />
       <Stack.Screen name="profile" options={{ title: "My Profile", headerBackTitle: "Back" }} />
