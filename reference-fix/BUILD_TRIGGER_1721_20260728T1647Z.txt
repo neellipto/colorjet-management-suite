@@ -1,0 +1,5 @@
+COLORJET Management Suite additive build retrigger
+Package: com.colorjetbd.managementsuite
+Version: 1.7.2
+VersionCode: 1721
+Requested after GitHub Actions budget update.
