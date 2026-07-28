@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -26,20 +27,85 @@ function valueOf(kpi: KpiValue): string {
   return String(kpi.value);
 }
 
+function reportTarget(item: KpiValue): { code: string; filters: Record<string, unknown> } | null {
+  const drillDown = item.drillDown;
+  if (!drillDown?.route || item.permissionResult !== 'allowed') return null;
+
+  try {
+    const url = new URL(drillDown.route, 'https://colorjet.local');
+    const segments = url.pathname.split('/').filter(Boolean);
+    const reportsIndex = segments.indexOf('reports');
+    const code = reportsIndex >= 0 ? segments.slice(reportsIndex + 1).join('/') : segments.at(-1) ?? '';
+    if (!code) return null;
+
+    const filters: Record<string, unknown> = { ...(drillDown.filters ?? {}) };
+    url.searchParams.forEach((value, key) => {
+      if (key === 'period') {
+        const aliases: Record<string, string> = {
+          current_month: 'this_month',
+          current_week: 'this_week',
+          current_year: 'year',
+        };
+        filters.periodPreset = aliases[value] ?? value;
+      } else {
+        filters[key] = value;
+      }
+    });
+    return { code, filters };
+  } catch {
+    return null;
+  }
+}
+
 function KpiCard({ item }: { item: KpiValue }) {
   const colors = useColors();
   const trendIcon = item.trend === 'up' ? 'trending-up' : item.trend === 'down' ? 'trending-down' : 'minus';
+  const target = reportTarget(item);
+  const disabled = !target;
+
+  const openReport = () => {
+    if (!target) return;
+    router.push({
+      pathname: '/report',
+      params: {
+        code: target.code,
+        title: item.label,
+        filters: JSON.stringify(target.filters),
+      },
+    } as never);
+  };
+
   return (
-    <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <TouchableOpacity
+      activeOpacity={0.78}
+      disabled={disabled}
+      onPress={openReport}
+      style={[
+        styles.kpiCard,
+        {
+          backgroundColor: colors.card,
+          borderColor: disabled ? colors.border : colors.primary,
+          borderLeftColor: item.permissionResult === 'redacted' ? colors.secondary : colors.primary,
+          opacity: item.permissionResult === 'denied' ? 0.55 : 1,
+        },
+      ]}
+    >
       <View style={styles.kpiHeader}>
         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={2}>{item.label}</Text>
-        <Feather name={trendIcon} size={16} color={item.trend === 'down' ? colors.destructive : colors.primary} />
+        <Feather
+          name={item.permissionResult === 'allowed' ? trendIcon : 'lock'}
+          size={16}
+          color={item.trend === 'down' ? colors.destructive : colors.primary}
+        />
       </View>
       <Text style={[styles.kpiValue, { color: colors.foreground }]}>{valueOf(item)}</Text>
-      <Text style={[styles.kpiSource, { color: colors.mutedForeground }]} numberOfLines={1}>
-        {item.dataFreshness ? `Updated ${item.dataFreshness}` : item.source}
-      </Text>
-    </View>
+      <View style={styles.kpiFooter}>
+        <Text style={[styles.kpiSource, { color: colors.mutedForeground }]} numberOfLines={1}>
+          {item.dataFreshness ? `Updated ${item.dataFreshness}` : item.source}
+        </Text>
+        {target && <Feather name="arrow-up-right" size={14} color={colors.primary} />}
+      </View>
+    </TouchableOpacity>
   );
 }
 
@@ -78,7 +144,7 @@ export default function OwnerCommandCenterScreen() {
 
   if (!allowed) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+      <View style={[styles.center, { backgroundColor: colors.background, paddingTop: insets.top }]}> 
         <Feather name="lock" size={34} color={colors.mutedForeground} />
         <Text style={[styles.lockTitle, { color: colors.foreground }]}>Owner access required</Text>
         <Text style={[styles.lockText, { color: colors.mutedForeground }]}>This dashboard requires an active ERP Owner session and server-confirmed permission.</Text>
@@ -105,7 +171,7 @@ export default function OwnerCommandCenterScreen() {
       </View>
 
       {error && (
-        <View style={[styles.errorBox, { borderColor: colors.destructive, backgroundColor: colors.card }]}>
+        <View style={[styles.errorBox, { borderColor: colors.destructive, backgroundColor: colors.card }]}> 
           <Text style={{ color: colors.destructive }}>{error}</Text>
         </View>
       )}
@@ -114,7 +180,13 @@ export default function OwnerCommandCenterScreen() {
         {(dashboard?.kpis ?? []).map(item => <KpiCard key={item.code} item={item} />)}
       </View>
 
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {!dashboard?.kpis?.length && !loading && !error && (
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No source-backed KPI returned by the ERP.</Text>
+        </View>
+      )}
+
+      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}> 
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Daily Executive Brief</Text>
         <Text style={[styles.sectionMeta, { color: colors.mutedForeground }]}>{brief?.date ?? 'Latest available data'}</Text>
         {(brief?.risks ?? []).slice(0, 8).map((risk, index) => (
@@ -131,16 +203,23 @@ export default function OwnerCommandCenterScreen() {
         )}
       </View>
 
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}> 
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recommended Owner Actions</Text>
         {(brief?.recommendedActions ?? []).slice(0, 8).map((action, index) => (
-          <View key={`${action.title}-${index}`} style={styles.listRow}>
+          <TouchableOpacity
+            activeOpacity={action.route ? 0.78 : 1}
+            disabled={!action.route}
+            onPress={() => action.route && router.push(action.route as never)}
+            key={`${action.title}-${index}`}
+            style={styles.listRow}
+          >
             <Feather name="check-circle" size={16} color={colors.primary} />
             <View style={styles.listText}>
               <Text style={[styles.listTitle, { color: colors.foreground }]}>{action.title}</Text>
               <Text style={[styles.listDetail, { color: colors.mutedForeground }]}>{action.detail}</Text>
             </View>
-          </View>
+            {action.route && <Feather name="chevron-right" size={16} color={colors.primary} />}
+          </TouchableOpacity>
         ))}
       </View>
     </ScrollView>
@@ -151,26 +230,27 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 12 },
   lockTitle: { fontSize: 20, fontFamily: 'Inter_700Bold' },
-  lockText: { fontSize: 14, lineHeight: 21, textAlign: 'center', fontFamily: 'Inter_400Regular' },
-  button: { paddingHorizontal: 18, paddingVertical: 12, borderRadius: 10, marginTop: 6 },
-  buttonText: { color: '#fff', fontFamily: 'Inter_600SemiBold' },
+  lockText: { fontSize: 14, lineHeight: 21, textAlign: 'center', fontFamily: 'Inter_500Medium' },
+  button: { minHeight: 44, paddingHorizontal: 18, borderRadius: 10, marginTop: 6, justifyContent: 'center' },
+  buttonText: { color: '#fff', fontFamily: 'Inter_700Bold' },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  eyebrow: { fontSize: 12, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.5 },
+  eyebrow: { fontSize: 12, fontFamily: 'Inter_700Bold', textTransform: 'uppercase', letterSpacing: 0.5 },
   title: { fontSize: 25, fontFamily: 'Inter_700Bold', marginTop: 2 },
-  subtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 3 },
+  subtitle: { fontSize: 12, fontFamily: 'Inter_500Medium', marginTop: 3 },
   errorBox: { borderWidth: 1, borderRadius: 10, padding: 12 },
   kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  kpiCard: { width: '48.5%', minHeight: 116, borderWidth: 1, borderRadius: 14, padding: 13, justifyContent: 'space-between' },
+  kpiCard: { flexBasis: '47%', flexGrow: 1, minHeight: 122, borderWidth: 1, borderLeftWidth: 4, borderRadius: 14, padding: 13, justifyContent: 'space-between' },
   kpiHeader: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
-  kpiLabel: { flex: 1, fontSize: 12, fontFamily: 'Inter_500Medium' },
+  kpiLabel: { flex: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   kpiValue: { fontSize: 21, fontFamily: 'Inter_700Bold', marginVertical: 8 },
-  kpiSource: { fontSize: 10, fontFamily: 'Inter_400Regular' },
-  section: { borderWidth: 1, borderRadius: 14, padding: 14, gap: 10 },
+  kpiFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
+  kpiSource: { flex: 1, fontSize: 10, fontFamily: 'Inter_500Medium' },
+  section: { borderWidth: 1, borderLeftWidth: 4, borderLeftColor: '#0D47A1', borderRadius: 14, padding: 14, gap: 10 },
   sectionTitle: { fontSize: 16, fontFamily: 'Inter_700Bold' },
-  sectionMeta: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: -6 },
-  listRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 5 },
+  sectionMeta: { fontSize: 11, fontFamily: 'Inter_500Medium', marginTop: -6 },
+  listRow: { minHeight: 44, flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 6 },
   listText: { flex: 1, gap: 2 },
-  listTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  listDetail: { fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular' },
-  emptyText: { fontSize: 13, fontFamily: 'Inter_400Regular', paddingVertical: 8 },
+  listTitle: { fontSize: 13, fontFamily: 'Inter_700Bold' },
+  listDetail: { fontSize: 12, lineHeight: 17, fontFamily: 'Inter_500Medium' },
+  emptyText: { fontSize: 13, fontFamily: 'Inter_500Medium', paddingVertical: 8 },
 });
