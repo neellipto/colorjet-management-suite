@@ -50,8 +50,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": "affe8187-2811-4f17-9620-dbf8d542577a"
-      }
+        "projectId": "ea419f70-a1b3-4265-9e21-5461341ab541"
+      },
+      "firebaseAndroidAppId": "1:475854312836:android:c68d85ee194443660c39d1"
     },
     "owner": "neellipto"
   }
