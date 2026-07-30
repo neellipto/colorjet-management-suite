@@ -1,0 +1,5 @@
+COLORJET Android additive build trigger
+Package: com.colorjetbd.managementsuite
+Version: 1.7.2
+VersionCode: 1721
+Triggered after Actions settings were saved on 2026-07-30.
