@@ -1,0 +1,5 @@
+COLORJET Management Suite Android additive build trigger
+Package: com.colorjetbd.managementsuite
+Version: 1.7.2
+Version code: 1721
+Triggered after GitHub billing/payment correction on 2026-07-30 21:07 Asia/Dhaka.
