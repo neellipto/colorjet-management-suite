@@ -16,6 +16,10 @@ function fmt(n: number) {
   return `৳${n.toLocaleString()}`;
 }
 
+function getLocalMonthKey(now = new Date()) {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
 const CATEGORIES = ['Transport', 'Salary', 'Entertainment', 'Rent', 'Utility', 'Labour', 'LC/Customs', 'Office', 'Other'];
 const METHODS = ['Cash', 'Bank Transfer', 'bKash', 'Nagad', 'Card'];
 
@@ -56,8 +60,9 @@ export default function ExpensesScreen() {
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState(METHODS[0]);
+  const month = getLocalMonthKey();
 
-  const mtdExpenses = useMemo(() => expenses.filter(e => e.expenseDate.startsWith('2024-06')), [expenses]);
+  const mtdExpenses = useMemo(() => expenses.filter(e => e.expenseDate.startsWith(month)), [expenses, month]);
   const total = useMemo(() => mtdExpenses.reduce((s, e) => s + e.amount, 0), [mtdExpenses]);
 
   const pb = insets.bottom + (Platform.OS === 'web' ? 34 : 0) + 80;
