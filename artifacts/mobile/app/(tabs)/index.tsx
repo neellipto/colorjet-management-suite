@@ -8,16 +8,13 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { StatCard } from '@/components/StatCard';
 import { useApp } from '@/context/AppContext';
 import { useColors } from '@/hooks/useColors';
+import { getLocalDateKey, getLocalMonthKey } from '@/lib/dateKeys';
 import type { Invoice, ServiceTicket, MarketingTask } from '@/constants/types';
 
 function fmt(n: number) {
   if (n >= 1000000) return `৳${(n / 1000000).toFixed(1)}M`;
   if (n >= 1000) return `৳${(n / 1000).toFixed(0)}K`;
   return `৳${n.toLocaleString()}`;
-}
-
-function getLocalMonthKey(now = new Date()) {
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
 function InvoiceRow({ invoice }: { invoice: Invoice }) {
@@ -92,9 +89,10 @@ export default function DashboardScreen() {
   const isStore = role === 'store';
   const isCustomer = role === 'customer';
   const isServiceControl = role === 'service_control';
+  const month = getLocalMonthKey();
+  const today = getLocalDateKey();
 
   const stats = useMemo(() => {
-    const month = getLocalMonthKey();
     const mtdInvoices = invoices.filter(i => i.invoiceDate.startsWith(month));
     const mtdPayments = payments.filter(p => p.paymentDate.startsWith(month));
     const mtdExpenses = expenses.filter(e => e.expenseDate.startsWith(month));
@@ -108,7 +106,7 @@ export default function DashboardScreen() {
       pendingDeliveries: deliveries.filter(d => d.status !== 'delivered').length,
       lowStockCount: products.filter(p => p.currentStock < p.minStockQty).length,
     };
-  }, [invoices, payments, expenses, tickets, deliveries, products]);
+  }, [invoices, payments, expenses, tickets, deliveries, products, month]);
 
   const engStats = useMemo(() => {
     const mine = tickets.filter(t => t.assignedEngineerId === currentUser?.id);
@@ -117,10 +115,10 @@ export default function DashboardScreen() {
       open: mine.filter(t => openStatuses.includes(t.status)).length,
       inProgress: mine.filter(t => t.status === 'in_progress').length,
       completed: mine.filter(t => t.status === 'completed').length,
-      today: mine.filter(t => t.plannedDate === new Date().toISOString().split('T')[0] || t.status === 'in_progress').length,
+      today: mine.filter(t => t.plannedDate === today || t.status === 'in_progress').length,
       partsUsed: mine.reduce((s, t) => s + (t.usedParts?.length ?? 0), 0),
     };
-  }, [tickets, currentUser]);
+  }, [tickets, currentUser, today]);
 
   const myTickets = useMemo(() => tickets.filter(t => t.assignedEngineerId === currentUser?.id && t.status !== 'completed' && t.status !== 'cancelled'), [tickets, currentUser]);
   const myTasks = useMemo(() => tasks.filter(t => t.assignedMarketingId === currentUser?.id && t.status !== 'done'), [tasks, currentUser]);
