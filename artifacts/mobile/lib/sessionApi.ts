@@ -64,7 +64,11 @@ export async function loginToErp(request: LoginRequest): Promise<LoginResult> {
     device_id: request.deviceId,
     device_name: request.deviceName,
     app_version: request.appVersion,
-  }, { skipAuthentication: true, retryAfterRefresh: false });
+  }, {
+    skipAuthentication: true,
+    retryAfterRefresh: false,
+    timeoutMs: 10_000,
+  });
 
   const session = result.session
     ? normalizeSession(result.session)
@@ -84,7 +88,7 @@ export async function fetchCurrentErpSession(): Promise<CurrentSessionResult> {
 
 export async function logoutFromErp(deviceId?: string): Promise<void> {
   try {
-    await erpApi.post<void>('/auth/logout', { device_id: deviceId });
+    await erpApi.post<void>('/auth/logout', { device_id: deviceId }, { timeoutMs: 5_000 });
   } finally {
     await clearErpSession();
   }
