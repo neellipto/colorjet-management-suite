@@ -1,22 +1,45 @@
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { FlatList, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Platform,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Badge, statusBadge, statusLabel } from '@/components/Badge';
 import { EmptyState } from '@/components/EmptyState';
 import { StatCard } from '@/components/StatCard';
 import { useApp } from '@/context/AppContext';
+import { useDeliveryRuntime } from '@/context/DeliveryRuntimeContext';
+import { useErpRuntime } from '@/context/ErpRuntimeContext';
 import { useColors } from '@/hooks/useColors';
+import { can } from '@/lib/effectivePermissions';
 import type { DeliveryOrder } from '@/constants/types';
 
-type DOFilter = 'all' | 'pending' | 'out_for_delivery' | 'delivered';
+type DOFilter = 'all' | 'pending' | 'out_for_delivery' | 'delivered' | 'failed';
 
-function DeliveryCard({ delivery, onUpdateStatus, canUpdate }: { delivery: DeliveryOrder; onUpdateStatus: (id: string, status: DeliveryOrder['status']) => void; canUpdate: boolean }) {
+function DeliveryCard({
+  delivery,
+  onUpdateStatus,
+  canUpdate,
+}: {
+  delivery: DeliveryOrder;
+  onUpdateStatus: (id: string, status: DeliveryOrder['status']) => void;
+  canUpdate: boolean;
+}) {
   const colors = useColors();
   const statusIcons: Record<string, keyof typeof Feather.glyphMap> = {
-    pending: 'clock', out_for_delivery: 'truck', delivered: 'check-circle',
+    pending: 'clock',
+    out_for_delivery: 'truck',
+    delivered: 'check-circle',
+    failed: 'x-circle',
   };
   const icon = statusIcons[delivery.status] ?? 'package';
 
@@ -36,34 +59,42 @@ function DeliveryCard({ delivery, onUpdateStatus, canUpdate }: { delivery: Deliv
       <Text style={[styles.custName, { color: colors.foreground }]}>{delivery.customerName}</Text>
 
       <View style={styles.infoGrid}>
-        <InfoChip icon="user" value={delivery.receiverName} colors={colors} />
-        <InfoChip icon="phone" value={delivery.receiverPhone} colors={colors} />
-        <InfoChip icon="user-check" value={delivery.deliveredByName} colors={colors} />
+        {delivery.receiverName ? <InfoChip icon="user" value={delivery.receiverName} colors={colors} /> : null}
+        {delivery.receiverPhone ? <InfoChip icon="phone" value={delivery.receiverPhone} colors={colors} /> : null}
+        {delivery.deliveredByName ? <InfoChip icon="user-check" value={delivery.deliveredByName} colors={colors} /> : null}
         {delivery.vehicleNo ? <InfoChip icon="truck" value={delivery.vehicleNo} colors={colors} /> : null}
       </View>
 
-      <View style={[styles.itemsList, { backgroundColor: colors.background, borderColor: colors.border }]}>
-        {delivery.items.map((item, i) => (
-          <Text key={i} style={[styles.itemText, { color: colors.mutedForeground }]}>• {item}</Text>
-        ))}
-      </View>
+      {delivery.items.length > 0 ? (
+        <View style={[styles.itemsList, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          {delivery.items.map((item, i) => (
+            <Text key={`${delivery.id}-${i}`} style={[styles.itemText, { color: colors.mutedForeground }]}>• {item}</Text>
+          ))}
+        </View>
+      ) : null}
 
       {canUpdate && delivery.status !== 'delivered' && (
         <View style={styles.actionRow}>
-          {delivery.status === 'pending' && (
+          {(delivery.status === 'pending' || delivery.status === 'failed') && (
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: colors.info }]}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onUpdateStatus(delivery.id, 'out_for_delivery'); }}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                onUpdateStatus(delivery.id, 'out_for_delivery');
+              }}
               activeOpacity={0.85}
             >
               <Feather name="truck" size={14} color="#fff" />
-              <Text style={styles.actionText}>Dispatch</Text>
+              <Text style={styles.actionText}>{delivery.status === 'failed' ? 'Retry Dispatch' : 'Dispatch'}</Text>
             </TouchableOpacity>
           )}
           {delivery.status === 'out_for_delivery' && (
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: colors.success }]}
-              onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); onUpdateStatus(delivery.id, 'delivered'); }}
+              onPress={() => {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                onUpdateStatus(delivery.id, 'delivered');
+              }}
               activeOpacity={0.85}
             >
               <Feather name="check-circle" size={14} color="#fff" />
@@ -88,10 +119,22 @@ function InfoChip({ icon, value, colors }: { icon: keyof typeof Feather.glyphMap
 export default function DeliveryScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { deliveries, currentUser, updateDeliveryStatus } = useApp();
+  const { currentUser } = useApp();
+  const { permissions } = useErpRuntime();
+  const {
+    deliveries,
+    isLoading,
+    isErpBacked,
+    error,
+    refresh,
+    updateStatus,
+    clearError,
+  } = useDeliveryRuntime();
 
   const role = currentUser?.role ?? '';
-  const canUpdate = role === 'admin' || role === 'marketing';
+  const canUpdate = isErpBacked
+    ? can(permissions, 'sales-orders', 'edit')
+    : role === 'admin' || role === 'marketing';
 
   const [filter, setFilter] = useState<DOFilter>('all');
 
@@ -109,45 +152,83 @@ export default function DeliveryScreen() {
   const pb = insets.bottom + (Platform.OS === 'web' ? 34 : 0);
   const pt = Platform.OS === 'web' ? 67 : 0;
 
-  const FILTERS: { label: string; key: DOFilter }[] = [
+  const filters: { label: string; key: DOFilter }[] = [
     { label: 'All', key: 'all' },
     { label: 'Pending', key: 'pending' },
     { label: 'Dispatched', key: 'out_for_delivery' },
     { label: 'Delivered', key: 'delivered' },
+    { label: 'Failed', key: 'failed' },
   ];
+
+  const handleUpdateStatus = async (id: string, status: DeliveryOrder['status']) => {
+    try {
+      await updateStatus(id, status);
+    } catch (updateError) {
+      Alert.alert('Delivery update failed', updateError instanceof Error ? updateError.message : 'Refresh and try again.');
+    }
+  };
 
   return (
     <FlatList
       style={{ flex: 1, backgroundColor: colors.background }}
       contentContainerStyle={{ paddingTop: pt + 16, paddingBottom: pb + 24, paddingHorizontal: 16, gap: 12 }}
+      refreshControl={<RefreshControl refreshing={isLoading} onRefresh={() => { void refresh(); }} tintColor={colors.primary} />}
       ListHeaderComponent={
         <>
-          <Text style={[styles.screenTitle, { color: colors.foreground }]}>Deliveries</Text>
+          <View style={styles.titleRow}>
+            <Text style={[styles.screenTitle, { color: colors.foreground }]}>Deliveries</Text>
+            <View style={[styles.sourceBadge, { backgroundColor: isErpBacked ? '#E8F5E9' : colors.muted }]}>
+              <View style={[styles.sourceDot, { backgroundColor: isErpBacked ? colors.success : colors.mutedForeground }]} />
+              <Text style={[styles.sourceText, { color: isErpBacked ? colors.success : colors.mutedForeground }]}>
+                {isErpBacked ? 'ERP Live' : 'Local fallback'}
+              </Text>
+            </View>
+          </View>
+          {error ? (
+            <View style={[styles.errorBanner, { backgroundColor: '#FFF3E0', borderColor: '#FFCC80' }]}>
+              <Feather name="alert-circle" size={16} color="#E65100" />
+              <Text style={styles.errorText} numberOfLines={3}>{error}</Text>
+              <TouchableOpacity onPress={() => { clearError(); void refresh(); }} hitSlop={6}>
+                <Text style={styles.retryText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <StatCard label="Pending" value={String(stats.pending)} accent="warning" />
             <StatCard label="In Transit" value={String(stats.outForDelivery)} accent="primary" />
             <StatCard label="Delivered" value={String(stats.delivered)} accent="success" />
           </View>
           <View style={styles.filterRow}>
-            {FILTERS.map(f => (
+            {filters.map(item => (
               <TouchableOpacity
-                key={f.key}
-                style={[styles.filterBtn, { backgroundColor: filter === f.key ? colors.primary : colors.card, borderColor: filter === f.key ? colors.primary : colors.border }]}
-                onPress={() => setFilter(f.key)}
+                key={item.key}
+                style={[styles.filterBtn, { backgroundColor: filter === item.key ? colors.primary : colors.card, borderColor: filter === item.key ? colors.primary : colors.border }]}
+                onPress={() => setFilter(item.key)}
                 activeOpacity={0.75}
               >
-                <Text style={[styles.filterText, { color: filter === f.key ? '#fff' : colors.mutedForeground }]}>{f.label}</Text>
+                <Text style={[styles.filterText, { color: filter === item.key ? '#fff' : colors.mutedForeground }]}>{item.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
         </>
       }
       data={filtered}
-      keyExtractor={d => d.id}
+      keyExtractor={delivery => delivery.id}
       renderItem={({ item }) => (
-        <DeliveryCard delivery={item} onUpdateStatus={updateDeliveryStatus} canUpdate={canUpdate} />
+        <DeliveryCard
+          delivery={item}
+          onUpdateStatus={(id, status) => { void handleUpdateStatus(id, status); }}
+          canUpdate={canUpdate}
+        />
       )}
-      ListEmptyComponent={<EmptyState icon="truck" title="No deliveries found" description="No delivery orders match your filter." />}
+      ListEmptyComponent={isLoading
+        ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>Loading deliveries...</Text>
+          </View>
+        )
+        : <EmptyState icon="truck" title="No deliveries found" description="No delivery orders match your filter." />}
       ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
       showsVerticalScrollIndicator={false}
     />
@@ -155,7 +236,14 @@ export default function DeliveryScreen() {
 }
 
 const styles = StyleSheet.create({
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   screenTitle: { fontSize: 22, fontFamily: 'Inter_700Bold', marginBottom: 4 },
+  sourceBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
+  sourceDot: { width: 6, height: 6, borderRadius: 3 },
+  sourceText: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
+  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1 },
+  errorText: { flex: 1, color: '#8D4A00', fontSize: 11, fontFamily: 'Inter_400Regular' },
+  retryText: { color: '#E65100', fontSize: 12, fontFamily: 'Inter_700Bold' },
   filterRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   filterBtn: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1 },
   filterText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
@@ -174,4 +262,6 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: 8 },
   actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 10, paddingVertical: 10 },
   actionText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_700Bold' },
+  loadingState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 12 },
+  loadingText: { fontSize: 14, fontFamily: 'Inter_500Medium' },
 });
