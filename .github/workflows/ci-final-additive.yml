@@ -77,6 +77,20 @@ jobs:
             exit 1
           fi
 
+      - name: Verify ERP notification bridge
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f artifacts/mobile/context/NotificationRuntimeContext.tsx
+          test -f artifacts/mobile/lib/notificationsApi.ts
+          grep -q 'NotificationRuntimeProvider' artifacts/mobile/app/_layout.tsx
+          grep -q 'listNotifications' artifacts/mobile/context/NotificationRuntimeContext.tsx
+          grep -q 'markErpNotificationRead' artifacts/mobile/context/NotificationRuntimeContext.tsx
+          grep -q 'bindErpSession' artifacts/mobile/app/login.tsx
+          grep -q 'logoutErp' artifacts/mobile/app/'(tabs)'/more.tsx
+          grep -q 'useNotificationRuntime' artifacts/mobile/app/notifications.tsx
+          grep -q 'useNotificationRuntime' artifacts/mobile/app/'(tabs)'/more.tsx
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:

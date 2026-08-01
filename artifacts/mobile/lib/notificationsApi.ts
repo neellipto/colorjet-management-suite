@@ -32,6 +32,85 @@ export type ErpNotification = {
   }>;
 };
 
+type UnknownRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): UnknownRecord | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as UnknownRecord : null;
+}
+
+function text(value: unknown, fallback = ''): string {
+  if (value === null || value === undefined) return fallback;
+  return String(value);
+}
+
+function optionalText(value: unknown): string | null {
+  const normalized = text(value).trim();
+  return normalized || null;
+}
+
+function notificationStatus(value: unknown, record: UnknownRecord): NotificationStatus {
+  const normalized = text(value).toLowerCase();
+  const allowed: NotificationStatus[] = ['unread', 'read', 'acknowledged', 'assigned', 'resolved', 'dismissed'];
+  if (allowed.includes(normalized as NotificationStatus)) return normalized as NotificationStatus;
+  return record.readAt || record.read_at ? 'read' : 'unread';
+}
+
+function notificationSeverity(value: unknown): NotificationSeverity {
+  const normalized = text(value).toLowerCase();
+  const allowed: NotificationSeverity[] = ['info', 'warning', 'high', 'critical'];
+  return allowed.includes(normalized as NotificationSeverity) ? normalized as NotificationSeverity : 'info';
+}
+
+function notificationChannels(value: unknown): NotificationChannel[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const allowed: NotificationChannel[] = ['in_app', 'push', 'email', 'sms', 'whatsapp'];
+  const channels = value
+    .map(item => text(item).toLowerCase())
+    .filter((item): item is NotificationChannel => allowed.includes(item as NotificationChannel));
+  return channels.length > 0 ? channels : undefined;
+}
+
+function normalizeNotification(value: unknown): ErpNotification {
+  const record = asRecord(value);
+  if (!record) throw new Error('ERP notification response is invalid.');
+
+  const id = text(record.id ?? record.notification_id).trim();
+  if (!id) throw new Error('ERP notification response does not include an ID.');
+
+  return {
+    id,
+    type: text(record.type ?? record.notification_type, 'general'),
+    title: text(record.title ?? record.subject, 'Notification'),
+    body: text(record.body ?? record.message ?? record.description),
+    severity: notificationSeverity(record.severity ?? record.priority),
+    status: notificationStatus(record.status, record),
+    entity: optionalText(record.entity ?? record.entity_type),
+    entityId: optionalText(record.entityId ?? record.entity_id),
+    route: optionalText(record.route ?? record.deep_link ?? record.action_url),
+    createdAt: text(record.createdAt ?? record.created_at, new Date().toISOString()),
+    readAt: optionalText(record.readAt ?? record.read_at),
+    acknowledgedAt: optionalText(record.acknowledgedAt ?? record.acknowledged_at),
+    acknowledgedBy: optionalText(record.acknowledgedBy ?? record.acknowledged_by),
+    assignedTo: optionalText(record.assignedTo ?? record.assigned_to),
+    resolvedAt: optionalText(record.resolvedAt ?? record.resolved_at),
+    channels: notificationChannels(record.channels),
+  };
+}
+
+function notificationRows(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  const record = asRecord(value);
+  if (!record) return [];
+
+  for (const key of ['items', 'notifications', 'data']) {
+    const candidate = record[key];
+    if (Array.isArray(candidate)) return candidate;
+    const nested = asRecord(candidate);
+    if (nested && Array.isArray(nested.data)) return nested.data;
+  }
+  return [];
+}
+
 export async function listNotifications(input: {
   status?: NotificationStatus;
   severity?: NotificationSeverity;
@@ -46,37 +125,41 @@ export async function listNotifications(input: {
   if (input.page) search.set('page', String(Math.max(1, Math.trunc(input.page))));
   if (input.limit) search.set('limit', String(Math.max(1, Math.min(200, Math.trunc(input.limit)))));
   const suffix = search.toString() ? `?${search.toString()}` : '';
-  return erpApi.get<ErpNotification[]>(`/notifications${suffix}`);
+  const response = await erpApi.get<unknown>(`/notifications${suffix}`);
+  return notificationRows(response).map(normalizeNotification);
 }
 
 export async function markNotificationRead(notificationId: string): Promise<ErpNotification> {
-  return erpApi.post<ErpNotification>(
+  const response = await erpApi.post<unknown>(
     `/notifications/${encodeURIComponent(notificationId)}/read`,
     {},
     { idempotencyKey: `notification-read:${notificationId}` },
   );
+  return normalizeNotification(response);
 }
 
 export async function acknowledgeNotification(
   notificationId: string,
   note?: string | null,
 ): Promise<ErpNotification> {
-  return erpApi.post<ErpNotification>(
+  const response = await erpApi.post<unknown>(
     `/notifications/${encodeURIComponent(notificationId)}/acknowledge`,
     { note },
     { idempotencyKey: `notification-ack:${notificationId}` },
   );
+  return normalizeNotification(response);
 }
 
 export async function resolveNotification(
   notificationId: string,
   resolution: string,
 ): Promise<ErpNotification> {
-  return erpApi.post<ErpNotification>(
+  const response = await erpApi.post<unknown>(
     `/notifications/${encodeURIComponent(notificationId)}/resolve`,
     { resolution },
     { idempotencyKey: `notification-resolve:${notificationId}` },
   );
+  return normalizeNotification(response);
 }
 
 export async function registerFcmToken(input: {

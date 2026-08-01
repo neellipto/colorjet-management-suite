@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Badge } from '@/components/Badge';
 import { useApp } from '@/context/AppContext';
 import { useErpRuntime } from '@/context/ErpRuntimeContext';
+import { useNotificationRuntime } from '@/context/NotificationRuntimeContext';
 import { can } from '@/lib/effectivePermissions';
 import { useColors } from '@/hooks/useColors';
 
@@ -49,8 +50,12 @@ function SectionLabel({ label }: { label: string }) {
 export default function MoreScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { currentUser, logout, notifications, products } = useApp();
-  const { permissions: erpPermissions } = useErpRuntime();
+  const { currentUser, logout, products } = useApp();
+  const {
+    permissions: erpPermissions,
+    logout: logoutErp,
+  } = useErpRuntime();
+  const { unreadCount } = useNotificationRuntime();
   const role = currentUser?.role ?? 'customer';
   const isAdmin = role === 'admin' || role === 'manager';
   const isAccounts = role === 'accounts';
@@ -62,7 +67,6 @@ export default function MoreScreen() {
   const canViewManualRegisters = isOwner || can(erpPermissions, 'manual_registers', 'view');
 
   const lowStockCount = products.filter(p => p.currentStock < p.minStockQty).length;
-  const unread = notifications.filter(n => !n.isRead).length;
 
   const pb = insets.bottom + (Platform.OS === 'web' ? 34 : 0) + 70;
   const pt = Platform.OS === 'web' ? 67 : 0;
@@ -70,7 +74,16 @@ export default function MoreScreen() {
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: () => { logout(); router.replace('/login'); } },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            await Promise.allSettled([logout(), logoutErp()]);
+            router.replace('/login');
+          })();
+        },
+      },
     ]);
   };
 
@@ -179,7 +192,7 @@ export default function MoreScreen() {
         label="Notifications"
         subtitle="Alerts and updates"
         onPress={() => router.push('/notifications' as any)}
-        badge={unread > 0 ? String(unread) : undefined}
+        badge={unreadCount > 0 ? String(unreadCount) : undefined}
         iconBg="#FFF8E1"
         iconColor="#F57F17"
       />
