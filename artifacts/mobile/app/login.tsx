@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '@/context/AppContext';
+import { useErpRuntime } from '@/context/ErpRuntimeContext';
 import { getSupabase } from '@/lib/supabaseClient';
 import { productionConfig } from '@/lib/runtimeConfig';
 import { useColors } from '@/hooks/useColors';
@@ -16,6 +17,7 @@ export default function LoginScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { login } = useApp();
+  const { login: bindErpSession } = useErpRuntime();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -28,9 +30,17 @@ export default function LoginScreen() {
       return;
     }
     setLoading(true);
-    const ok = await login(email.trim(), password.trim());
+    const identifier = email.trim();
+    const ok = await login(identifier, password);
     setLoading(false);
     if (ok) {
+      // Preserve the working Supabase session while binding the additive PHP ERP runtime.
+      // ERP connection failures remain non-blocking until the backend migration is complete.
+      void bindErpSession({
+        identifier,
+        password,
+        identifierType: 'email',
+      });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace('/(tabs)');
     } else {
