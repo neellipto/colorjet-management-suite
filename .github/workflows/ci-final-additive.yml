@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/final-additive-update-1721
+  pull_request:
+    branches:
+      - agent/final-additive-update-1721
   workflow_dispatch:
 
 permissions:
@@ -12,7 +15,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,3 +49,28 @@ jobs:
           grep -q 'Idempotency-Key' artifacts/mobile/lib/erpApi.ts
           grep -q 'permissionVersion' artifacts/mobile/context/ErpRuntimeContext.tsx
           echo 'Protected additive source verified'
+
+      - name: Reject stale fixed reporting period
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R --line-number --fixed-strings "2024-06" \
+            artifacts/mobile/app/'(tabs)'/index.tsx \
+            artifacts/mobile/app/reports.tsx \
+            artifacts/mobile/app/expenses.tsx; then
+            echo 'Hard-coded June 2024 reporting period is not allowed.' >&2
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install mobile dependencies
+        working-directory: artifacts/mobile
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: TypeScript check
+        working-directory: artifacts/mobile
+        run: npm run typecheck
