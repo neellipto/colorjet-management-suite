@@ -15,6 +15,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppProvider } from "@/context/AppContext";
+import { DeliveryRuntimeProvider } from "@/context/DeliveryRuntimeContext";
 import { ErpRuntimeProvider } from "@/context/ErpRuntimeContext";
 import { NotificationRuntimeProvider } from "@/context/NotificationRuntimeContext";
 
@@ -89,13 +90,15 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <ErpRuntimeProvider>
             <AppProvider>
-              <NotificationRuntimeProvider>
-                <GestureHandlerRootView style={{ flex: 1 }}>
-                  <KeyboardProvider>
-                    <RootLayoutNav />
-                  </KeyboardProvider>
-                </GestureHandlerRootView>
-              </NotificationRuntimeProvider>
+              <DeliveryRuntimeProvider>
+                <NotificationRuntimeProvider>
+                  <GestureHandlerRootView style={{ flex: 1 }}>
+                    <KeyboardProvider>
+                      <RootLayoutNav />
+                    </KeyboardProvider>
+                  </GestureHandlerRootView>
+                </NotificationRuntimeProvider>
+              </DeliveryRuntimeProvider>
             </AppProvider>
           </ErpRuntimeProvider>
         </QueryClientProvider>
