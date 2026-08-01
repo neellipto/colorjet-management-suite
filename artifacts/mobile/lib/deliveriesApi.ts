@@ -2,6 +2,7 @@ import type { DeliveryOrder } from '@/constants/types';
 import { erpApi } from '@/lib/erpApi';
 
 export type ErpDeliveryOrder = DeliveryOrder & {
+  assignedToName?: string;
   lockVersion: number;
   dispatchedAt?: string | null;
   deliveredAt?: string | null;
@@ -21,6 +22,11 @@ function text(value: unknown, fallback = ''): string {
 function optionalText(value: unknown): string | null {
   const normalized = text(value).trim();
   return normalized || null;
+}
+
+function positiveInteger(value: unknown, fallback = 1): number {
+  const normalized = Number(value);
+  return Number.isInteger(normalized) && normalized > 0 ? normalized : fallback;
 }
 
 function rows(value: unknown): unknown[] {
@@ -76,7 +82,7 @@ export function normalizeDelivery(value: unknown): ErpDeliveryOrder {
     assignedToName: optionalText(record.assignedToName ?? record.assigned_to_name) ?? undefined,
     address: text(record.address ?? record.delivery_address),
     notes: optionalText(record.notes) ?? undefined,
-    lockVersion: Number(record.lockVersion ?? record.lock_version ?? 1),
+    lockVersion: positiveInteger(record.lockVersion ?? record.lock_version),
     dispatchedAt: optionalText(record.dispatchedAt ?? record.dispatched_at),
     deliveredAt: optionalText(record.deliveredAt ?? record.delivered_at),
   };
