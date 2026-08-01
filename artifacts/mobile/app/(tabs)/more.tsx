@@ -51,7 +51,11 @@ export default function MoreScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { currentUser, logout, products } = useApp();
-  const { permissions: erpPermissions } = useErpRuntime();
+  const {
+    permissions: erpPermissions,
+    authenticated: erpAuthenticated,
+    logout: logoutErp,
+  } = useErpRuntime();
   const { unreadCount } = useNotificationRuntime();
   const role = currentUser?.role ?? 'customer';
   const isAdmin = role === 'admin' || role === 'manager';
@@ -71,7 +75,18 @@ export default function MoreScreen() {
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: () => { logout(); router.replace('/login'); } },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            const requests: Promise<unknown>[] = [logout()];
+            if (erpAuthenticated) requests.push(logoutErp());
+            await Promise.allSettled(requests);
+            router.replace('/login');
+          })();
+        },
+      },
     ]);
   };
 
