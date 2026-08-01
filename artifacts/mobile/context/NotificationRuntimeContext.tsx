@@ -119,7 +119,6 @@ export function NotificationRuntimeProvider({ children }: { children: React.Reac
       return;
     }
 
-    const previous = remoteNotifications;
     setRemoteNotifications(items => items.map(item => item.id === notificationId ? { ...item, isRead: true } : item));
     try {
       const updated = await markErpNotificationRead(notificationId);
@@ -127,11 +126,11 @@ export function NotificationRuntimeProvider({ children }: { children: React.Reac
       setRemoteNotifications(items => items.map(item => item.id === notificationId ? mapped : item));
       setError(null);
     } catch (markError) {
-      setRemoteNotifications(previous);
+      setRemoteNotifications(items => items.map(item => item.id === notificationId ? target : item));
       setError(messageOf(markError));
       throw markError;
     }
-  }, [notifications, markLegacyNotificationRead, remoteNotifications]);
+  }, [notifications, markLegacyNotificationRead]);
 
   const markAllRead = useCallback(async () => {
     const unread = notifications.filter(item => !item.isRead);
@@ -142,19 +141,35 @@ export function NotificationRuntimeProvider({ children }: { children: React.Reac
       return;
     }
 
-    const previous = remoteNotifications;
-    setRemoteNotifications(items => items.map(item => ({ ...item, isRead: true })));
-    const results = await Promise.allSettled(unread.map(item => markErpNotificationRead(item.id)));
-    const failed = results.some(result => result.status === 'rejected');
-    if (failed) {
-      setRemoteNotifications(previous);
-      setError('Some notifications could not be marked as read. The list has been restored.');
+    const previousById = new Map(unread.map(item => [item.id, item]));
+    setRemoteNotifications(items => items.map(item => previousById.has(item.id) ? { ...item, isRead: true } : item));
+
+    const results = await Promise.allSettled(unread.map(async item => ({
+      id: item.id,
+      notification: await markErpNotificationRead(item.id),
+    })));
+    const successful = new Map<string, NotificationFeedItem>();
+    let failedCount = 0;
+    results.forEach(result => {
+      if (result.status === 'fulfilled') {
+        successful.set(result.value.id, mapErpNotification(result.value.notification));
+      } else {
+        failedCount += 1;
+      }
+    });
+
+    setRemoteNotifications(items => items.map(item => {
+      const updated = successful.get(item.id);
+      if (updated) return updated;
+      return previousById.get(item.id) ?? item;
+    }));
+
+    if (failedCount > 0) {
+      setError(`${failedCount} notification${failedCount === 1 ? '' : 's'} could not be marked as read.`);
       return;
     }
-
     setError(null);
-    await refresh();
-  }, [notifications, isErpBacked, markAllLegacyNotificationsRead, remoteNotifications, refresh]);
+  }, [notifications, isErpBacked, markAllLegacyNotificationsRead]);
 
   const clearError = useCallback(() => setError(null), []);
   const unreadCount = notifications.filter(item => !item.isRead).length;
