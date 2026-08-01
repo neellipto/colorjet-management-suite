@@ -1,4 +1,10 @@
-import { clearErpSession, erpApi, saveErpSession, type ErpSession } from '@/lib/erpApi';
+import {
+  clearErpSession,
+  erpApi,
+  readErpSession,
+  saveErpSession,
+  type ErpSession,
+} from '@/lib/erpApi';
 
 export type LoginIdentifierType = 'email' | 'phone' | 'employee_code';
 
@@ -87,10 +93,24 @@ export async function fetchCurrentErpSession(): Promise<CurrentSessionResult> {
 }
 
 export async function logoutFromErp(deviceId?: string): Promise<void> {
-  try {
-    await erpApi.post<void>('/auth/logout', { device_id: deviceId }, { timeoutMs: 5_000 });
-  } finally {
+  const session = await readErpSession();
+  if (!session?.accessToken) {
     await clearErpSession();
+    return;
+  }
+
+  try {
+    await erpApi.post<void>('/auth/logout', { device_id: deviceId }, {
+      headers: { Authorization: `Bearer ${session.accessToken}` },
+      skipAuthentication: true,
+      retryAfterRefresh: false,
+      timeoutMs: 5_000,
+    });
+  } finally {
+    const current = await readErpSession();
+    if (current?.accessToken === session.accessToken) {
+      await clearErpSession();
+    }
   }
 }
 
