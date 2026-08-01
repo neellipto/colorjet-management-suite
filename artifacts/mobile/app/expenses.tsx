@@ -10,14 +10,11 @@ import { EmptyState } from '@/components/EmptyState';
 import { StatCard } from '@/components/StatCard';
 import { useApp } from '@/context/AppContext';
 import { useColors } from '@/hooks/useColors';
+import { getLocalDateKey, getLocalMonthKey } from '@/lib/dateKeys';
 import type { Expense } from '@/constants/types';
 
 function fmt(n: number) {
   return `৳${n.toLocaleString()}`;
-}
-
-function getLocalMonthKey(now = new Date()) {
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
 const CATEGORIES = ['Transport', 'Salary', 'Entertainment', 'Rent', 'Utility', 'Labour', 'LC/Customs', 'Office', 'Other'];
@@ -73,7 +70,7 @@ export default function ExpensesScreen() {
     if (!description.trim()) { Alert.alert('Required', 'Enter a description.'); return; }
     if (!amt || amt <= 0) { Alert.alert('Invalid', 'Enter a valid amount.'); return; }
     addExpense({
-      expenseDate: new Date().toISOString().split('T')[0],
+      expenseDate: getLocalDateKey(),
       category,
       description: description.trim(),
       amount: amt,

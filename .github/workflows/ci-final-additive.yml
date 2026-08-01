@@ -62,6 +62,21 @@ jobs:
             exit 1
           fi
 
+      - name: Verify local business date consistency
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f artifacts/mobile/lib/dateKeys.ts
+          grep -q 'getLocalDateKey' artifacts/mobile/app/expenses.tsx
+          grep -q 'getLocalDateKey' artifacts/mobile/app/'(tabs)'/index.tsx
+          grep -q 'getLocalMonthPeriod' artifacts/mobile/app/reports.tsx
+          if grep -R --line-number --fixed-strings "toISOString().split('T')[0]" \
+            artifacts/mobile/app/expenses.tsx \
+            artifacts/mobile/app/'(tabs)'/index.tsx; then
+            echo 'UTC date keys must not be mixed with local business-month reporting.' >&2
+            exit 1
+          fi
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:

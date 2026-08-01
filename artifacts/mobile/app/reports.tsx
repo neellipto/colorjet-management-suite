@@ -7,17 +7,12 @@ import { StatCard } from '@/components/StatCard';
 import { SectionHeader } from '@/components/SectionHeader';
 import { useApp } from '@/context/AppContext';
 import { useColors } from '@/hooks/useColors';
+import { getLocalMonthPeriod } from '@/lib/dateKeys';
 
 function fmt(n: number) {
   if (n >= 1000000) return `৳${(n / 1000000).toFixed(2)}M`;
   if (n >= 1000) return `৳${(n / 1000).toFixed(1)}K`;
   return `৳${n.toLocaleString()}`;
-}
-
-function getLocalMonthPeriod(now = new Date()) {
-  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const label = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  return { month, label };
 }
 
 export default function ReportsScreen() {
