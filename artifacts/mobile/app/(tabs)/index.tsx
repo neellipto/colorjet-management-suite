@@ -16,6 +16,10 @@ function fmt(n: number) {
   return `৳${n.toLocaleString()}`;
 }
 
+function getLocalMonthKey(now = new Date()) {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
 function InvoiceRow({ invoice }: { invoice: Invoice }) {
   const colors = useColors();
   return (
@@ -90,7 +94,7 @@ export default function DashboardScreen() {
   const isServiceControl = role === 'service_control';
 
   const stats = useMemo(() => {
-    const month = '2024-06';
+    const month = getLocalMonthKey();
     const mtdInvoices = invoices.filter(i => i.invoiceDate.startsWith(month));
     const mtdPayments = payments.filter(p => p.paymentDate.startsWith(month));
     const mtdExpenses = expenses.filter(e => e.expenseDate.startsWith(month));

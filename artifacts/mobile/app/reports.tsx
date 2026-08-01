@@ -14,12 +14,17 @@ function fmt(n: number) {
   return `৳${n.toLocaleString()}`;
 }
 
+function getLocalMonthPeriod(now = new Date()) {
+  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const label = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  return { month, label };
+}
+
 export default function ReportsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { invoices, payments, expenses, customers, tickets, engineers } = useApp();
-
-  const month = '2024-06';
+  const { month, label: periodLabel } = getLocalMonthPeriod();
 
   const report = useMemo(() => {
     const mtdSales = invoices.filter(i => i.invoiceDate.startsWith(month)).reduce((s, i) => s + i.totalAmount, 0);
@@ -46,7 +51,7 @@ export default function ReportsScreen() {
       .slice(0, 5);
 
     return { mtdSales, mtdCollection, totalDue, mtdExpenses, grossProfit, byCustomer, expenseBreakdown, completedTickets, openTickets, topEngineers };
-  }, [invoices, payments, expenses, customers, tickets, engineers]);
+  }, [invoices, payments, expenses, customers, tickets, engineers, month]);
 
   const pb = insets.bottom + (Platform.OS === 'web' ? 34 : 0);
   const pt = Platform.OS === 'web' ? 16 : 0;
@@ -58,7 +63,7 @@ export default function ReportsScreen() {
       showsVerticalScrollIndicator={false}
     >
       <Text style={[styles.screenTitle, { color: colors.foreground }]}>Reports Center</Text>
-      <Text style={[styles.period, { color: colors.mutedForeground }]}>Period: June 2024</Text>
+      <Text style={[styles.period, { color: colors.mutedForeground }]}>Period: {periodLabel}</Text>
 
       {/* Revenue */}
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
