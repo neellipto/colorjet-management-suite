@@ -53,7 +53,6 @@ export default function MoreScreen() {
   const { currentUser, logout, products } = useApp();
   const {
     permissions: erpPermissions,
-    authenticated: erpAuthenticated,
     logout: logoutErp,
   } = useErpRuntime();
   const { unreadCount } = useNotificationRuntime();
@@ -80,9 +79,7 @@ export default function MoreScreen() {
         style: 'destructive',
         onPress: () => {
           void (async () => {
-            const requests: Promise<unknown>[] = [logout()];
-            if (erpAuthenticated) requests.push(logoutErp());
-            await Promise.allSettled(requests);
+            await Promise.allSettled([logout(), logoutErp()]);
             router.replace('/login');
           })();
         },
