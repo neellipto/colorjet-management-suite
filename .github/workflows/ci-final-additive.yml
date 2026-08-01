@@ -90,6 +90,22 @@ jobs:
           grep -q 'logoutErp' artifacts/mobile/app/'(tabs)'/more.tsx
           grep -q 'useNotificationRuntime' artifacts/mobile/app/notifications.tsx
           grep -q 'useNotificationRuntime' artifacts/mobile/app/'(tabs)'/more.tsx
+          grep -q 'useNotificationRuntime' artifacts/mobile/app/'(tabs)'/index.tsx
+
+      - name: Verify ERP delivery bridge
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f artifacts/mobile/lib/deliveriesApi.ts
+          test -f artifacts/mobile/context/DeliveryRuntimeContext.tsx
+          grep -q 'DeliveryRuntimeProvider' artifacts/mobile/app/_layout.tsx
+          grep -q 'listDeliveries' artifacts/mobile/context/DeliveryRuntimeContext.tsx
+          grep -q 'updateErpDeliveryStatus' artifacts/mobile/context/DeliveryRuntimeContext.tsx
+          grep -q 'useDeliveryRuntime' artifacts/mobile/app/delivery.tsx
+          grep -q 'useDeliveryRuntime' artifacts/mobile/app/'(tabs)'/index.tsx
+          grep -q "can(permissions, 'sales-orders', 'edit')" artifacts/mobile/app/delivery.tsx
+          grep -q 'lock_version' artifacts/mobile/lib/deliveriesApi.ts
+          grep -q 'Idempotency-Key' artifacts/mobile/lib/erpApi.ts
 
       - name: Set up Node.js
         uses: actions/setup-node@v4

@@ -1,12 +1,14 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useMemo } from 'react';
-import { FlatList, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Badge, statusBadge, statusLabel } from '@/components/Badge';
 import { SectionHeader } from '@/components/SectionHeader';
 import { StatCard } from '@/components/StatCard';
 import { useApp } from '@/context/AppContext';
+import { useDeliveryRuntime } from '@/context/DeliveryRuntimeContext';
+import { useNotificationRuntime } from '@/context/NotificationRuntimeContext';
 import { useColors } from '@/hooks/useColors';
 import { getLocalDateKey, getLocalMonthKey } from '@/lib/dateKeys';
 import type { Invoice, ServiceTicket, MarketingTask } from '@/constants/types';
@@ -81,7 +83,9 @@ function QuickAction({ icon, label, onPress }: { icon: keyof typeof Feather.glyp
 export default function DashboardScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { currentUser, invoices, payments, tickets, products, deliveries, expenses, tasks, notifications } = useApp();
+  const { currentUser, invoices, payments, tickets, products, expenses, tasks } = useApp();
+  const { deliveries } = useDeliveryRuntime();
+  const { unreadCount } = useNotificationRuntime();
   const role = currentUser?.role ?? 'customer';
   const isAdmin = role === 'admin' || role === 'accounts' || role === 'manager';
   const isEngineer = role === 'engineer';
@@ -124,7 +128,6 @@ export default function DashboardScreen() {
   const myTasks = useMemo(() => tasks.filter(t => t.assignedMarketingId === currentUser?.id && t.status !== 'done'), [tasks, currentUser]);
   const recentInvoices = useMemo(() => invoices.slice(0, 5), [invoices]);
   const recentTickets = useMemo(() => tickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').slice(0, 5), [tickets]);
-  const unreadNotifs = notifications.filter(n => !n.isRead);
 
   const pb = insets.bottom + (Platform.OS === 'web' ? 34 : 0) + 70;
   const pt = Platform.OS === 'web' ? 67 : 0;
@@ -142,16 +145,15 @@ export default function DashboardScreen() {
       contentContainerStyle={{ paddingTop: pt + 16, paddingBottom: pb, paddingHorizontal: 16, gap: 20 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* Header */}
       <View style={styles.headerRow}>
         <View>
           <Text style={[styles.greeting, { color: colors.mutedForeground }]}>{greeting()},</Text>
           <Text style={[styles.userName, { color: colors.foreground }]}>{currentUser?.name?.split(' ')[0] ?? 'User'}</Text>
         </View>
         <View style={styles.headerActions}>
-          {unreadNotifs.length > 0 && (
+          {unreadCount > 0 && (
             <View style={[styles.notifDot, { backgroundColor: colors.destructive }]}>
-              <Text style={styles.notifDotText}>{unreadNotifs.length}</Text>
+              <Text style={styles.notifDotText}>{unreadCount}</Text>
             </View>
           )}
           <TouchableOpacity style={[styles.avatarBtn, { backgroundColor: colors.navyLight }]} onPress={() => router.push('/profile' as any)} activeOpacity={0.8}>
@@ -160,7 +162,6 @@ export default function DashboardScreen() {
         </View>
       </View>
 
-      {/* Stats — Admin/Accounts */}
       {isAdmin && (
         <>
           <View style={styles.statsRow}>
@@ -179,7 +180,6 @@ export default function DashboardScreen() {
         </>
       )}
 
-      {/* Stats — Engineer */}
       {isEngineer && (
         <>
           <View style={styles.statsRow}>
@@ -205,7 +205,6 @@ export default function DashboardScreen() {
         </>
       )}
 
-      {/* Stats — Service Control */}
       {isServiceControl && (
         <>
           <View style={styles.statsRow}>
@@ -223,7 +222,6 @@ export default function DashboardScreen() {
         </>
       )}
 
-      {/* Stats — Marketing */}
       {isMarketing && (
         <>
           <View style={styles.statsRow}>
@@ -239,7 +237,6 @@ export default function DashboardScreen() {
         </>
       )}
 
-      {/* Stats — Store */}
       {isStore && (
         <>
           <View style={styles.statsRow}>
@@ -252,7 +249,6 @@ export default function DashboardScreen() {
         </>
       )}
 
-      {/* Stats — Customer */}
       {isCustomer && (
         <>
           <View style={styles.statsRow}>
@@ -265,7 +261,6 @@ export default function DashboardScreen() {
         </>
       )}
 
-      {/* Recent Invoices (admin/accounts/customer) */}
       {(isAdmin || isCustomer) && (
         <>
           <SectionHeader title="Recent Invoices" actionLabel="View All" onAction={() => router.push('/(tabs)/sales' as any)} />
@@ -273,7 +268,6 @@ export default function DashboardScreen() {
         </>
       )}
 
-      {/* Recent Tickets (admin) */}
       {isAdmin && (
         <>
           <SectionHeader title="Open Service Tickets" actionLabel="View All" onAction={() => router.push('/(tabs)/service' as any)} />
