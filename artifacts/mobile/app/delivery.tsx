@@ -29,10 +29,12 @@ function DeliveryCard({
   delivery,
   onUpdateStatus,
   canUpdate,
+  isUpdating,
 }: {
   delivery: DeliveryOrder;
   onUpdateStatus: (id: string, status: DeliveryOrder['status']) => void;
   canUpdate: boolean;
+  isUpdating: boolean;
 }) {
   const colors = useColors();
   const statusIcons: Record<string, keyof typeof Feather.glyphMap> = {
@@ -42,6 +44,24 @@ function DeliveryCard({
     failed: 'x-circle',
   };
   const icon = statusIcons[delivery.status] ?? 'package';
+
+  const confirmFailed = () => {
+    Alert.alert(
+      'Mark delivery failed?',
+      'This delivery can be dispatched again after the failure is recorded.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Mark Failed',
+          style: 'destructive',
+          onPress: () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            onUpdateStatus(delivery.id, 'failed');
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -75,31 +95,50 @@ function DeliveryCard({
 
       {canUpdate && delivery.status !== 'delivered' && (
         <View style={styles.actionRow}>
-          {(delivery.status === 'pending' || delivery.status === 'failed') && (
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: colors.info }]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                onUpdateStatus(delivery.id, 'out_for_delivery');
-              }}
-              activeOpacity={0.85}
-            >
-              <Feather name="truck" size={14} color="#fff" />
-              <Text style={styles.actionText}>{delivery.status === 'failed' ? 'Retry Dispatch' : 'Dispatch'}</Text>
-            </TouchableOpacity>
-          )}
-          {delivery.status === 'out_for_delivery' && (
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: colors.success }]}
-              onPress={() => {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                onUpdateStatus(delivery.id, 'delivered');
-              }}
-              activeOpacity={0.85}
-            >
-              <Feather name="check-circle" size={14} color="#fff" />
-              <Text style={styles.actionText}>Mark Delivered</Text>
-            </TouchableOpacity>
+          {isUpdating ? (
+            <View style={[styles.actionBtn, { backgroundColor: colors.muted }]}> 
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[styles.actionText, { color: colors.primary }]}>Updating...</Text>
+            </View>
+          ) : (
+            <>
+              {(delivery.status === 'pending' || delivery.status === 'failed') && (
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: colors.info }]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    onUpdateStatus(delivery.id, 'out_for_delivery');
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Feather name="truck" size={14} color="#fff" />
+                  <Text style={styles.actionText}>{delivery.status === 'failed' ? 'Retry Dispatch' : 'Dispatch'}</Text>
+                </TouchableOpacity>
+              )}
+              {delivery.status === 'out_for_delivery' && (
+                <>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { backgroundColor: colors.destructive }]}
+                    onPress={confirmFailed}
+                    activeOpacity={0.85}
+                  >
+                    <Feather name="x-circle" size={14} color="#fff" />
+                    <Text style={styles.actionText}>Failed</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { backgroundColor: colors.success }]}
+                    onPress={() => {
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                      onUpdateStatus(delivery.id, 'delivered');
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Feather name="check-circle" size={14} color="#fff" />
+                    <Text style={styles.actionText}>Delivered</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </>
           )}
         </View>
       )}
@@ -123,6 +162,7 @@ export default function DeliveryScreen() {
   const { permissions } = useErpRuntime();
   const {
     deliveries,
+    updatingIds,
     isLoading,
     isErpBacked,
     error,
@@ -219,6 +259,7 @@ export default function DeliveryScreen() {
           delivery={item}
           onUpdateStatus={(id, status) => { void handleUpdateStatus(id, status); }}
           canUpdate={canUpdate}
+          isUpdating={updatingIds.has(item.id)}
         />
       )}
       ListEmptyComponent={isLoading
