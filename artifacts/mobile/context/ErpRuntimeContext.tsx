@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import type { EffectivePermissionPayload } from '@/lib/effectivePermissions';
 import { clearErpSession, readErpSession } from '@/lib/erpApi';
@@ -44,11 +44,20 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : 'Unable to connect to COLORJET ERP.';
 }
 
+async function clearMatchingSession(accessToken: string): Promise<void> {
+  const current = await readErpSession();
+  if (current?.accessToken === accessToken) await clearErpSession();
+}
+
 export function ErpRuntimeProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<ErpRuntimeState>(EMPTY_STATE);
+  const operationRef = useRef(0);
 
   const refreshIdentity = useCallback(async () => {
+    const operation = operationRef.current;
     const localSession = await readErpSession();
+    if (operation !== operationRef.current) return;
+
     if (!localSession?.accessToken) {
       setState(previous => ({
         ...previous,
@@ -67,6 +76,7 @@ export function ErpRuntimeProvider({ children }: { children: React.ReactNode }) 
         fetchCurrentErpSession(),
         fetchEffectivePermissions(),
       ]);
+      if (operation !== operationRef.current) return;
       setState({
         bootstrapping: false,
         authenticated: true,
@@ -77,7 +87,9 @@ export function ErpRuntimeProvider({ children }: { children: React.ReactNode }) 
         error: null,
       });
     } catch (error) {
-      await clearErpSession();
+      if (operation !== operationRef.current) return;
+      await clearMatchingSession(localSession.accessToken);
+      if (operation !== operationRef.current) return;
       setState({
         bootstrapping: false,
         authenticated: false,
@@ -103,10 +115,27 @@ export function ErpRuntimeProvider({ children }: { children: React.ReactNode }) 
   }, [refreshIdentity]);
 
   const login = useCallback(async (request: LoginRequest): Promise<boolean> => {
-    setState(previous => ({ ...previous, bootstrapping: true, error: null }));
+    const operation = operationRef.current + 1;
+    operationRef.current = operation;
+    setState(previous => ({ ...previous, bootstrapping: true, authenticated: false, error: null }));
+    await clearErpSession();
+    if (operation !== operationRef.current) return false;
+
+    let issuedToken: string | null = null;
     try {
       const result = await loginToErp(request);
+      issuedToken = result.session.accessToken;
+      if (operation !== operationRef.current) {
+        await clearMatchingSession(result.session.accessToken);
+        return false;
+      }
+
       const permissions = await fetchEffectivePermissions();
+      if (operation !== operationRef.current) {
+        await clearMatchingSession(result.session.accessToken);
+        return false;
+      }
+
       setState({
         bootstrapping: false,
         authenticated: true,
@@ -118,7 +147,8 @@ export function ErpRuntimeProvider({ children }: { children: React.ReactNode }) 
       });
       return true;
     } catch (error) {
-      await clearErpSession();
+      if (issuedToken) await clearMatchingSession(issuedToken);
+      if (operation !== operationRef.current) return false;
       setState({
         bootstrapping: false,
         authenticated: false,
@@ -133,10 +163,15 @@ export function ErpRuntimeProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const logout = useCallback(async (deviceId?: string) => {
+    const operation = operationRef.current + 1;
+    operationRef.current = operation;
+    setState({ ...EMPTY_STATE, bootstrapping: false });
     try {
       await logoutFromErp(deviceId);
     } finally {
-      setState({ ...EMPTY_STATE, bootstrapping: false });
+      if (operation === operationRef.current) {
+        setState({ ...EMPTY_STATE, bootstrapping: false });
+      }
     }
   }, []);
 
