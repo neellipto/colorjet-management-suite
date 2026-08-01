@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { DeliveryOrder } from '@/constants/types';
 import { useApp } from '@/context/AppContext';
 import { useErpRuntime } from '@/context/ErpRuntimeContext';
@@ -14,6 +14,7 @@ export type DeliveryFeedItem = ErpDeliveryOrder & {
 
 type DeliveryRuntimeValue = {
   deliveries: DeliveryFeedItem[];
+  updatingIds: ReadonlySet<string>;
   isLoading: boolean;
   isErpBacked: boolean;
   error: string | null;
@@ -38,6 +39,14 @@ export function DeliveryRuntimeProvider({ children }: { children: React.ReactNod
   const [hasLoadedRemote, setHasLoadedRemote] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const updatingIdsRef = useRef(new Set<string>());
+  const [updatingIds, setUpdatingIds] = useState<ReadonlySet<string>>(new Set());
+
+  const setUpdating = useCallback((deliveryId: string, active: boolean) => {
+    if (active) updatingIdsRef.current.add(deliveryId);
+    else updatingIdsRef.current.delete(deliveryId);
+    setUpdatingIds(new Set(updatingIdsRef.current));
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!authenticated) {
@@ -88,6 +97,10 @@ export function DeliveryRuntimeProvider({ children }: { children: React.ReactNod
   }, [isErpBacked, remoteDeliveries, legacyFeed]);
 
   const updateStatus = useCallback(async (deliveryId: string, status: DeliveryOrder['status']) => {
+    if (updatingIdsRef.current.has(deliveryId)) {
+      throw new Error('This delivery update is already in progress.');
+    }
+
     const target = deliveries.find(item => item.id === deliveryId);
     if (!target || target.status === status) return;
 
@@ -96,6 +109,7 @@ export function DeliveryRuntimeProvider({ children }: { children: React.ReactNod
       return;
     }
 
+    setUpdating(deliveryId, true);
     setRemoteDeliveries(items => items.map(item => item.id === deliveryId
       ? { ...item, status, lockVersion: item.lockVersion + 1 }
       : item));
@@ -113,19 +127,22 @@ export function DeliveryRuntimeProvider({ children }: { children: React.ReactNod
       setRemoteDeliveries(items => items.map(item => item.id === deliveryId ? target : item));
       setError(messageOf(updateError));
       throw updateError;
+    } finally {
+      setUpdating(deliveryId, false);
     }
-  }, [deliveries, updateLegacyDeliveryStatus]);
+  }, [deliveries, setUpdating, updateLegacyDeliveryStatus]);
 
   const clearError = useCallback(() => setError(null), []);
   const value = useMemo<DeliveryRuntimeValue>(() => ({
     deliveries,
+    updatingIds,
     isLoading,
     isErpBacked,
     error,
     refresh,
     updateStatus,
     clearError,
-  }), [deliveries, isLoading, isErpBacked, error, refresh, updateStatus, clearError]);
+  }), [deliveries, updatingIds, isLoading, isErpBacked, error, refresh, updateStatus, clearError]);
 
   return <DeliveryRuntimeContext.Provider value={value}>{children}</DeliveryRuntimeContext.Provider>;
 }
