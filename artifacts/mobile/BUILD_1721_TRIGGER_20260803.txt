@@ -1,0 +1,4 @@
+COLORJET Management Suite signed Android build trigger
+Version: 1.7.2
+Version code: 1721
+Package: com.colorjetbd.managementsuite
