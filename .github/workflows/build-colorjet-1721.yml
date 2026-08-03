@@ -7,13 +7,19 @@ on:
     paths:
       - 'artifacts/mobile/**'
       - '.github/workflows/build-colorjet-1721.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'artifacts/mobile/**'
+      - '.github/workflows/build-colorjet-1721.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: colorjet-management-suite-1721
+  group: colorjet-management-suite-1721-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -137,7 +143,6 @@ jobs:
             --json > preview-build.json
 
       - name: Download signed APK
-        id: preview
         shell: bash
         run: |
           set -euo pipefail
@@ -173,7 +178,6 @@ jobs:
             --json > production-build.json
 
       - name: Download signed AAB
-        id: production
         shell: bash
         run: |
           set -euo pipefail
