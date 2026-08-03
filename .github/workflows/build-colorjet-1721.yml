@@ -19,12 +19,59 @@ permissions:
   contents: read
 
 concurrency:
-  group: colorjet-management-suite-1721-${{ github.ref }}
+  group: colorjet-management-suite-1721-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  validate:
+    name: Validate Android identity and Expo config
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: artifacts/mobile
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify locked Android identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const app = JSON.parse(fs.readFileSync('app.json', 'utf8')).expo;
+          const expected = {
+            slug: 'colorjet-app-',
+            package: 'com.colorjetbd.managementsuite',
+            version: '1.7.2',
+            versionCode: 1721,
+            easProjectId: 'ea419f70-a1b3-4265-9e21-5461341ab541',
+          };
+          if (app.slug !== expected.slug) throw new Error(`Slug mismatch: ${app.slug}`);
+          if (app.android?.package !== expected.package) throw new Error(`Package mismatch: ${app.android?.package}`);
+          if (app.version !== expected.version) throw new Error(`Version mismatch: ${app.version}`);
+          if (app.android?.versionCode !== expected.versionCode) throw new Error(`Version code mismatch: ${app.android?.versionCode}`);
+          if (app.extra?.eas?.projectId !== expected.easProjectId) throw new Error(`EAS project mismatch: ${app.extra?.eas?.projectId}`);
+          console.log('Android identity verified:', expected);
+          NODE
+
+      - name: Install dependencies and validate Expo config
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --legacy-peer-deps --no-audit --no-fund
+          npx expo config --type public >/tmp/colorjet-expo-config.json
+
   build-android:
     name: Build signed APK and AAB
+    if: github.event_name != 'pull_request'
+    needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
@@ -43,15 +90,15 @@ jobs:
         working-directory: artifacts/mobile
 
     steps:
-      - name: Checkout source
+      - name: Checkout protected build branch
         uses: actions/checkout@v4
+        with:
+          ref: build/colorjet-1721-final
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: npm
-          cache-dependency-path: artifacts/mobile/package.json
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -68,26 +115,6 @@ jobs:
           test -n "${KEYSTORE_PASSWORD:-}" || { echo 'Missing Android keystore password repository secret'; exit 1; }
           test -n "${KEY_ALIAS:-}" || { echo 'Missing Android key alias repository secret'; exit 1; }
           test -n "${KEY_PASSWORD:-}" || { echo 'Missing Android key password repository secret'; exit 1; }
-
-      - name: Verify locked Android identity
-        shell: bash
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const fs = require('fs');
-          const app = JSON.parse(fs.readFileSync('app.json', 'utf8')).expo;
-          const expected = {
-            package: 'com.colorjetbd.managementsuite',
-            version: '1.7.2',
-            versionCode: 1721,
-            easProjectId: 'ea419f70-a1b3-4265-9e21-5461341ab541',
-          };
-          if (app.android?.package !== expected.package) throw new Error(`Package mismatch: ${app.android?.package}`);
-          if (app.version !== expected.version) throw new Error(`Version mismatch: ${app.version}`);
-          if (app.android?.versionCode !== expected.versionCode) throw new Error(`Version code mismatch: ${app.android?.versionCode}`);
-          if (app.extra?.eas?.projectId !== expected.easProjectId) throw new Error(`EAS project mismatch: ${app.extra?.eas?.projectId}`);
-          console.log('Android identity verified:', expected);
-          NODE
 
       - name: Prepare existing production upload key
         shell: bash
