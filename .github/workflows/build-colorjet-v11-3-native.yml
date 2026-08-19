@@ -52,12 +52,14 @@ jobs:
           test -f app/build/outputs/apk/debug/app-debug.apk
           test -f app/build/outputs/apk/release/app-release.apk
           test -f app/build/outputs/bundle/release/app-release.aab
+          apksigner verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
+      - name: Package installable release ZIP
+        run: ./scripts/package-release.sh
       - name: Upload Android build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: COLORJET-ERP-Native-V11.4.1-SIGNED-Android
           path: |
-            android-v11.3-native/app/build/outputs/apk/**/*.apk
-            android-v11.3-native/app/build/outputs/bundle/**/*.aab
+            android-v11.3-native/release/*.zip
           if-no-files-found: error
           retention-days: 14
