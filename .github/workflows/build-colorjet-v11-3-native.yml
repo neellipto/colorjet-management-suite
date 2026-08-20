@@ -1,6 +1,11 @@
-name: Build COLORJET Native Android V11.4.1
+name: Build COLORJET Native Android ERP1
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'android-v11.3-native/**'
+      - '.github/workflows/build-colorjet-v11-3-native.yml'
   pull_request:
     branches: [main]
     paths:
@@ -58,7 +63,7 @@ jobs:
       - name: Upload Android build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: COLORJET-ERP-Native-V11.4.1-SIGNED-Android
+          name: COLORJET-ERP1-SIGNED-Android
           path: |
             android-v11.3-native/release/*.zip
           if-no-files-found: error

@@ -1,0 +1,1 @@
+Build COLORJET Management Suite reference-APK UI as version 1.7.1, versionCode 1702, package com.colorjetbd.managementsuite.
