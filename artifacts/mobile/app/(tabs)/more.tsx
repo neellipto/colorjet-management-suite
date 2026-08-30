@@ -6,6 +6,8 @@ import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View }
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Badge } from '@/components/Badge';
 import { useApp } from '@/context/AppContext';
+import { useErpRuntime } from '@/context/ErpRuntimeContext';
+import { can } from '@/lib/effectivePermissions';
 import { useColors } from '@/hooks/useColors';
 
 interface MenuItemProps {
@@ -48,6 +50,7 @@ export default function MoreScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { currentUser, logout, notifications, products } = useApp();
+  const { permissions: erpPermissions } = useErpRuntime();
   const role = currentUser?.role ?? 'customer';
   const isAdmin = role === 'admin' || role === 'manager';
   const isAccounts = role === 'accounts';
@@ -55,6 +58,8 @@ export default function MoreScreen() {
   const isEngineer = role === 'engineer';
   const isStore = role === 'store';
   const isServiceControl = role === 'service_control';
+  const isOwner = Boolean(erpPermissions?.isOwner);
+  const canViewManualRegisters = isOwner || can(erpPermissions, 'manual_registers', 'view');
 
   const lowStockCount = products.filter(p => p.currentStock < p.minStockQty).length;
   const unread = notifications.filter(n => !n.isRead).length;
@@ -86,6 +91,13 @@ export default function MoreScreen() {
         </View>
       </View>
 
+      {isOwner && (
+        <>
+          <SectionLabel label="OWNER CONTROL" />
+          <MenuItem icon="command" label="Owner Command Center" subtitle="Executive KPI, risks and approvals" onPress={() => router.push('/owner-command-center' as any)} iconBg={colors.navyLight} iconColor={colors.primary} />
+          <MenuItem icon="cpu" label="Owner AI" subtitle="Source-backed analysis and confirmed actions" onPress={() => router.push('/owner-ai' as any)} iconBg="#F3E5F5" iconColor="#7B1FA2" />
+        </>
+      )}
       {isAdmin && (
         <>
           <SectionLabel label="ADMIN CONTROL CENTER" />
@@ -99,6 +111,12 @@ export default function MoreScreen() {
         </>
       )}
 
+      {canViewManualRegisters && (
+        <>
+          <SectionLabel label="CUSTOM RECORDS" />
+          <MenuItem icon="clipboard" label="Manual Registers" subtitle="Amount, asset, item and custom records" onPress={() => router.push('/manual-registers' as any)} iconBg="#E8F5E9" iconColor="#2E7D32" />
+        </>
+      )}
       {(isAdmin || isServiceControl) && (
         <>
           <SectionLabel label="SERVICE OPERATIONS" />
@@ -124,7 +142,7 @@ export default function MoreScreen() {
         </>
       )}
 
-      {isEngineer && (
+      {(isAdmin || isEngineer) && (
         <>
           <SectionLabel label="ENGINEER OPERATIONS" />
           <MenuItem icon="navigation" label="My Field Visits" subtitle="Travel, check-in, work and customer confirmation" onPress={() => router.push('/field-operations' as any)} iconBg="#E3F2FD" iconColor="#1565C0" />
@@ -185,7 +203,7 @@ export default function MoreScreen() {
         <Text style={[styles.logoutText, { color: '#C62828' }]}>Sign Out</Text>
       </TouchableOpacity>
 
-      <Text style={[styles.version, { color: colors.mutedForeground }]}>COLORJET ERP V12 Engineer Operations · Bangladesh</Text>
+      <Text style={[styles.version, { color: colors.mutedForeground }]}>COLORJET Management Suite · Additive Update</Text>
     </ScrollView>
   );
 }

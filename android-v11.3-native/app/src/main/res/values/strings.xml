@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">COLORJET ERP</string>
+    <string name="erp_base_url">https://erp1.colorjetbd.com</string>
+    <string name="dashboard_url">https://erp1.colorjetbd.com/mobile</string>
+    <string name="attendance_url">https://erp1.colorjetbd.com/hr/attendance</string>
+    <string name="notifications_url">https://erp1.colorjetbd.com/notifications</string>
+    <string name="messages_url">https://erp1.colorjetbd.com/messages</string>
+    <string name="api_base_url">https://erp1.colorjetbd.com/api/</string>
+    <string name="notification_channel_name">COLORJET Duty Tracking</string>
+    <string name="notification_title">COLORJET route tracking active</string>
+    <string name="notification_text">Location is recorded only during an active duty or customer visit session.</string>
+    <string name="network_error">Unable to reach COLORJET ERP. Check internet access and retry.</string>
+    <string name="permission_required">Precise location permission is required for attendance and route history.</string>
+</resources>

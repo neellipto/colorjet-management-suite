@@ -1,12 +1,13 @@
 {
   "expo": {
-    "name": "COLORJET ERP",
+    "name": "COLORJET Management Suite",
     "slug": "colorjet-management-suite",
-    "version": "1.2.0",
+    "version": "1.7.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "colorjet-erp",
     "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash.png",
       "resizeMode": "contain",
@@ -18,11 +19,14 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "COLORJET uses your location to verify attendance and customer-site visits.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "During an active assigned field visit, COLORJET records the route with a visible tracking indicator."
+      },
+      "config": {
+        "usesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.colorjetbd.managementsuite",
-      "versionCode": 1200,
+      "versionCode": 1721,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -31,20 +35,27 @@
         "FOREGROUND_SERVICE_LOCATION",
         "POST_NOTIFICATIONS",
         "CAMERA"
-      ]
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#1A237E"
+      }
     },
     "web": {
       "favicon": "./assets/images/favicon.png",
       "bundler": "metro"
     },
     "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-web-browser",
+      "@react-native-community/datetimepicker",
       [
-        "expo-router",
+        "expo-secure-store",
         {
-          "origin": "https://replit.com/"
+          "configureAndroidBackup": true
         }
       ],
-      "expo-font",
       [
         "expo-location",
         {
@@ -55,7 +66,15 @@
       ]
     ],
     "experiments": {
-      "typedRoutes": true
-    }
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "ea419f70-a1b3-4265-9e21-5461341ab541"
+      },
+      "firebaseAndroidAppId": "1:475854312836:android:c68d85ee194443660c39d1"
+    },
+    "owner": "neellipto"
   }
 }

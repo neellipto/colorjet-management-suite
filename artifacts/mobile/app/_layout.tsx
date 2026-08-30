@@ -6,7 +6,6 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { setBaseUrl } from "@workspace/api-client-react";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
@@ -16,13 +15,9 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppProvider } from "@/context/AppContext";
+import { ErpRuntimeProvider } from "@/context/ErpRuntimeContext";
 
 SplashScreen.preventAutoHideAsync();
-
-const apiDomain = process.env.EXPO_PUBLIC_DOMAIN;
-if (apiDomain) {
-  setBaseUrl(`https://${apiDomain.replace(/^https?:\/\//, "")}`);
-}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,6 +43,7 @@ function RootLayoutNav() {
       <Stack.Screen name="ticket/report/[id]" options={{ title: "Service Report", headerBackTitle: "Back" }} />
       <Stack.Screen name="customer/[id]" options={{ title: "Customer", headerBackTitle: "Back" }} />
       <Stack.Screen name="reports" options={{ title: "Reports", headerBackTitle: "Back" }} />
+      <Stack.Screen name="report" options={{ title: "Report Detail", headerBackTitle: "Back" }} />
       <Stack.Screen name="expenses" options={{ title: "Expenses", headerBackTitle: "Back" }} />
       <Stack.Screen name="delivery" options={{ title: "Deliveries", headerBackTitle: "Back" }} />
       <Stack.Screen name="profile" options={{ title: "My Profile", headerBackTitle: "Back" }} />
@@ -56,6 +52,9 @@ function RootLayoutNav() {
       <Stack.Screen name="service-control" options={{ title: "Service Control", headerBackTitle: "Back" }} />
       <Stack.Screen name="field-operations" options={{ title: "Field Operations", headerBackTitle: "Back" }} />
       <Stack.Screen name="route-history" options={{ title: "Route History", headerBackTitle: "Back" }} />
+      <Stack.Screen name="owner-command-center" options={{ title: "Owner Command Center", headerBackTitle: "Back" }} />
+      <Stack.Screen name="owner-ai" options={{ title: "Owner AI", headerBackTitle: "Back" }} />
+      <Stack.Screen name="manual-registers" options={{ title: "Manual Registers", headerBackTitle: "Back" }} />
       <Stack.Screen name="admin/company" options={{ title: "Company Profile", headerBackTitle: "Back" }} />
       <Stack.Screen name="admin/branding" options={{ title: "Branding", headerBackTitle: "Back" }} />
       <Stack.Screen name="admin/catalog" options={{ title: "Catalog & Categories", headerBackTitle: "Back" }} />
@@ -89,13 +88,15 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <AppProvider>
-            <GestureHandlerRootView>
-              <KeyboardProvider>
-                <RootLayoutNav />
-              </KeyboardProvider>
-            </GestureHandlerRootView>
-          </AppProvider>
+          <ErpRuntimeProvider>
+            <AppProvider>
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <KeyboardProvider>
+                  <RootLayoutNav />
+                </KeyboardProvider>
+              </GestureHandlerRootView>
+            </AppProvider>
+          </ErpRuntimeProvider>
         </QueryClientProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
