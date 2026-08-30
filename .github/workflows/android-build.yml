@@ -40,11 +40,16 @@ jobs:
         working-directory: .
         run: pnpm install --frozen-lockfile
       - name: Use EXPO_PUBLIC secrets when set
+        env:
+          SECRET_EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          SECRET_EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          SECRET_EXPO_PUBLIC_AUTH_REDIRECT_URL: ${{ secrets.EXPO_PUBLIC_AUTH_REDIRECT_URL }}
+          SECRET_EXPO_PUBLIC_PASSWORD_RESET_REDIRECT: ${{ secrets.EXPO_PUBLIC_PASSWORD_RESET_REDIRECT }}
         run: |
-          [ -n "${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}" ] && echo "EXPO_PUBLIC_SUPABASE_URL=${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}" >> "$GITHUB_ENV" || true
-          [ -n "${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}" ] && echo "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}" >> "$GITHUB_ENV" || true
-          [ -n "${{ secrets.EXPO_PUBLIC_AUTH_REDIRECT_URL }}" ] && echo "EXPO_PUBLIC_AUTH_REDIRECT_URL=${{ secrets.EXPO_PUBLIC_AUTH_REDIRECT_URL }}" >> "$GITHUB_ENV" || true
-          [ -n "${{ secrets.EXPO_PUBLIC_PASSWORD_RESET_REDIRECT }}" ] && echo "EXPO_PUBLIC_PASSWORD_RESET_REDIRECT=${{ secrets.EXPO_PUBLIC_PASSWORD_RESET_REDIRECT }}" >> "$GITHUB_ENV" || true
+          [ -n "$SECRET_EXPO_PUBLIC_SUPABASE_URL" ] && echo "EXPO_PUBLIC_SUPABASE_URL=$SECRET_EXPO_PUBLIC_SUPABASE_URL" >> "$GITHUB_ENV" || true
+          [ -n "$SECRET_EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY" ] && echo "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$SECRET_EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY" >> "$GITHUB_ENV" || true
+          [ -n "$SECRET_EXPO_PUBLIC_AUTH_REDIRECT_URL" ] && echo "EXPO_PUBLIC_AUTH_REDIRECT_URL=$SECRET_EXPO_PUBLIC_AUTH_REDIRECT_URL" >> "$GITHUB_ENV" || true
+          [ -n "$SECRET_EXPO_PUBLIC_PASSWORD_RESET_REDIRECT" ] && echo "EXPO_PUBLIC_PASSWORD_RESET_REDIRECT=$SECRET_EXPO_PUBLIC_PASSWORD_RESET_REDIRECT" >> "$GITHUB_ENV" || true
       - name: Verify React Native Gradle plugin
         run: node --print "require.resolve('@react-native/gradle-plugin/package.json')"
       - name: Type-check
