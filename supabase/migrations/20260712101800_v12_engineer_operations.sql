@@ -610,6 +610,15 @@ with check (
   or public.v12_has_role(array['owner','super_admin','admin','manager','service_manager','store'])
 );
 
+drop policy if exists v12_parts_requests_delete on public.v12_parts_requests;
+create policy v12_parts_requests_delete on public.v12_parts_requests
+for delete to authenticated
+using (
+  requested_by = auth.uid()
+  or assigned_store_user_id = auth.uid()
+  or public.v12_has_role(array['owner','super_admin','admin','manager','service_manager','store'])
+);
+
 drop policy if exists v12_parts_request_items_select on public.v12_parts_request_items;
 create policy v12_parts_request_items_select on public.v12_parts_request_items
 for select to authenticated
@@ -686,7 +695,7 @@ grant select, insert, update on public.v12_customer_visits to authenticated;
 grant select on public.v12_visit_events to authenticated;
 grant select on public.v12_tracking_sessions to authenticated;
 grant select on public.v12_location_points to authenticated;
-grant select, insert, update on public.v12_parts_requests to authenticated;
+grant select, insert, update, delete on public.v12_parts_requests to authenticated;
 grant select, insert, update on public.v12_parts_request_items to authenticated;
 grant select, insert, update on public.v12_parts_dispatches to authenticated;
 grant select, insert, update on public.v12_parts_dispatch_items to authenticated;
