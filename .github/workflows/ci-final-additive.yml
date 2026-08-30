@@ -1,0 +1,48 @@
+name: COLORJET Android Additive CI
+
+on:
+  push:
+    branches:
+      - agent/final-additive-update-1721
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Android identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const app = JSON.parse(fs.readFileSync('artifacts/mobile/app.json', 'utf8')).expo;
+          if (app.android?.package !== 'com.colorjetbd.managementsuite') throw new Error('Package mismatch');
+          if (app.version !== '1.7.2') throw new Error('Version mismatch');
+          if (app.android?.versionCode !== 1721) throw new Error('Version code mismatch');
+          if (app.extra?.eas?.projectId !== 'ea419f70-a1b3-4265-9e21-5461341ab541') throw new Error('EAS project mismatch');
+          if (app.extra?.firebaseAndroidAppId !== '1:475854312836:android:c68d85ee194443660c39d1') throw new Error('Firebase app mismatch');
+          console.log('COLORJET Android identity verified');
+          NODE
+
+      - name: Verify protected source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f artifacts/mobile/lib/erpApi.ts
+          test -f artifacts/mobile/lib/offlineSyncQueue.ts
+          test -f artifacts/mobile/app/owner-command-center.tsx
+          test -f artifacts/mobile/app/owner-ai.tsx
+          test -f artifacts/mobile/app/manual-registers.tsx
+          test -f artifacts/mobile/app/report.tsx
+          grep -q 'SecureStore' artifacts/mobile/lib/erpApi.ts
+          grep -q 'Idempotency-Key' artifacts/mobile/lib/erpApi.ts
+          grep -q 'permissionVersion' artifacts/mobile/context/ErpRuntimeContext.tsx
+          echo 'Protected additive source verified'

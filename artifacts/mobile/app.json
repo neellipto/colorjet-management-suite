@@ -1,12 +1,13 @@
 {
   "expo": {
-    "name": "COLORJET ERP",
-    "slug": "colorjet-erp",
-    "version": "1.0.0",
+    "name": "COLORJET Management Suite",
+    "slug": "colorjet-management-suite",
+    "version": "1.7.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "colorjeterp",
+    "scheme": "colorjet-erp",
     "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash.png",
       "resizeMode": "contain",
@@ -14,31 +15,45 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "bd.com.colorjet.erp"
+      "bundleIdentifier": "com.colorjetbd.managementsuite",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
-      "package": "bd.com.colorjet.erp",
-      "versionCode": 1,
+      "package": "com.colorjetbd.managementsuite",
+      "versionCode": 1721,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#FFFFFF"
-      },
-      "permissions": [
-        "INTERNET",
-        "CAMERA",
-        "READ_MEDIA_IMAGES",
-        "POST_NOTIFICATIONS"
-      ]
+        "backgroundColor": "#1A237E"
+      }
     },
     "web": {
       "favicon": "./assets/images/favicon.png",
       "bundler": "metro"
     },
     "plugins": [
-      ["expo-router", {"origin": "https://erp.colorjetbd.com"}],
+      "expo-router",
       "expo-font",
-      ["expo-image-picker", {"photosPermission": "Allow COLORJET ERP to attach service and job photos.", "cameraPermission": "Allow COLORJET ERP to take service and job photos."}]
+      "expo-web-browser",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true
+        }
+      ]
     ],
-    "experiments": {"typedRoutes": true}
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "ea419f70-a1b3-4265-9e21-5461341ab541"
+      },
+      "firebaseAndroidAppId": "1:475854312836:android:c68d85ee194443660c39d1"
+    },
+    "owner": "neellipto"
   }
 }
