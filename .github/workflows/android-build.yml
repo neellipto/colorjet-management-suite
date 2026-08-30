@@ -38,11 +38,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Install dependencies
         working-directory: .
-        run: pnpm install --no-frozen-lockfile
-      - name: Align Expo SDK dependencies
-        env:
-          CI: "1"
-        run: pnpm exec expo install --fix
+        run: pnpm install --frozen-lockfile
+      - name: Use EXPO_PUBLIC secrets when set
+        run: |
+          [ -n "${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}" ] && echo "EXPO_PUBLIC_SUPABASE_URL=${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}" >> "$GITHUB_ENV" || true
+          [ -n "${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}" ] && echo "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}" >> "$GITHUB_ENV" || true
+          [ -n "${{ secrets.EXPO_PUBLIC_AUTH_REDIRECT_URL }}" ] && echo "EXPO_PUBLIC_AUTH_REDIRECT_URL=${{ secrets.EXPO_PUBLIC_AUTH_REDIRECT_URL }}" >> "$GITHUB_ENV" || true
+          [ -n "${{ secrets.EXPO_PUBLIC_PASSWORD_RESET_REDIRECT }}" ] && echo "EXPO_PUBLIC_PASSWORD_RESET_REDIRECT=${{ secrets.EXPO_PUBLIC_PASSWORD_RESET_REDIRECT }}" >> "$GITHUB_ENV" || true
       - name: Verify React Native Gradle plugin
         run: node --print "require.resolve('@react-native/gradle-plugin/package.json')"
       - name: Type-check
@@ -73,7 +75,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
-      contents: write
+      contents: read
     env:
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
@@ -98,6 +100,7 @@ jobs:
           test -n "$EXPO_PUBLIC_SUPABASE_URL"
           test -n "$EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
           test -n "$EXPO_PUBLIC_AUTH_REDIRECT_URL"
+          test -n "$EXPO_PUBLIC_PASSWORD_RESET_REDIRECT"
       - uses: pnpm/action-setup@v4
         with:
           version: 9
@@ -112,11 +115,7 @@ jobs:
           java-version: "17"
       - name: Install dependencies
         working-directory: .
-        run: pnpm install --no-frozen-lockfile
-      - name: Align Expo SDK dependencies
-        env:
-          CI: "1"
-        run: pnpm exec expo install --fix
+        run: pnpm install --frozen-lockfile
       - name: Generate Android project
         env:
           CI: "1"
@@ -125,12 +124,12 @@ jobs:
         run: printf '%s' "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
       - name: Build signed AAB
         working-directory: artifacts/mobile/android
-        run: >
-          ./gradlew bundleRelease
-          -Pandroid.injected.signing.store.file=${{ github.workspace }}/artifacts/mobile/android/app/upload-keystore.jks
-          -Pandroid.injected.signing.store.password=${{ secrets.ANDROID_STORE_PASSWORD }}
-          -Pandroid.injected.signing.key.alias=${{ secrets.ANDROID_KEY_ALIAS }}
-          -Pandroid.injected.signing.key.password=${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          ./gradlew bundleRelease \
+            -Pandroid.injected.signing.store.file="${{ github.workspace }}/artifacts/mobile/android/app/upload-keystore.jks" \
+            -Pandroid.injected.signing.store.password="${{ secrets.ANDROID_STORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.ANDROID_KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.ANDROID_KEY_PASSWORD }}"
       - name: Checksums
         run: sha256sum android/app/build/outputs/bundle/release/app-release.aab > checksums-release.sha256
       - uses: actions/upload-artifact@v4
