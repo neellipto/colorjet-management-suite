@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">COLORJET Field Service</string>
-    <string name="erp_url">https://kpi.ept.com.bd/field-service/</string>
+    <string name="erp_url">https://erp1.colorjetbd.com/field-service/</string>
     <string name="network_error_title">Internet connection unavailable</string>
     <string name="network_error_message">Please check your mobile data or Wi-Fi, then tap Retry.</string>
     <string name="retry">Retry</string>
