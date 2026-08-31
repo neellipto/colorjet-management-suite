@@ -1,4 +1,4 @@
-package com.colorjetbd.erp;
+package com.colorjetbd.managementsuite;
 
 import android.Manifest;
 import android.app.Notification;
