@@ -9,11 +9,11 @@ def releaseKeyPassword = System.getenv('ANDROID_KEY_PASSWORD')
 def releaseSigningReady = releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword
 
 android {
-    namespace 'com.colorjetbd.erp'
+    namespace 'com.colorjetbd.managementsuite'
     compileSdk 35
 
     defaultConfig {
-        applicationId 'com.colorjetbd.erp'
+        applicationId 'com.colorjetbd.managementsuite'
         minSdk 24
         targetSdk 35
         versionCode 11
