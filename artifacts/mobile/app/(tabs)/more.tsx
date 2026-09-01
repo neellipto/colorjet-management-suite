@@ -173,6 +173,9 @@ export default function MoreScreen() {
         </>
       )}
 
+      <SectionLabel label="MY WORKDAY" />
+      <MenuItem icon="clock" label="Attendance" subtitle="Check in, check out and view my history" onPress={() => router.push('/attendance' as any)} iconBg="#E8F5E9" iconColor="#2E7D32" />
+
       <SectionLabel label="NOTIFICATIONS" />
       <MenuItem
         icon="bell"

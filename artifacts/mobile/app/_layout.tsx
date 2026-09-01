@@ -47,6 +47,7 @@ function RootLayoutNav() {
       <Stack.Screen name="expenses" options={{ title: "Expenses", headerBackTitle: "Back" }} />
       <Stack.Screen name="delivery" options={{ title: "Deliveries", headerBackTitle: "Back" }} />
       <Stack.Screen name="profile" options={{ title: "My Profile", headerBackTitle: "Back" }} />
+      <Stack.Screen name="attendance" options={{ title: "My Attendance", headerBackTitle: "Back" }} />
       <Stack.Screen name="notifications" options={{ title: "Notifications", headerBackTitle: "Back" }} />
       <Stack.Screen name="schedule" options={{ title: "Engineer Schedule", headerBackTitle: "Back" }} />
       <Stack.Screen name="service-control" options={{ title: "Service Control", headerBackTitle: "Back" }} />
