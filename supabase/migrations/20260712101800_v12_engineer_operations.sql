@@ -451,13 +451,21 @@ declare
   v_session public.v12_tracking_sessions;
   v_point_id uuid;
 begin
+  if auth.uid() is null then
+    raise exception 'Authentication required';
+  end if;
+
+  if nullif(btrim(coalesce(p_idempotency_key, '')), '') is null then
+    raise exception 'idempotency_key is required';
+  end if;
+
   select * into v_session
   from public.v12_tracking_sessions
   where id = p_session_id and status = 'active';
 
   if not found then raise exception 'Active tracking session not found'; end if;
 
-  if v_session.engineer_id <> auth.uid()
+  if v_session.engineer_id is distinct from auth.uid()
      and not public.v12_has_role(array['owner','super_admin','admin','manager','service_manager']) then
     raise exception 'Not authorized for this tracking session';
   end if;
