@@ -4,7 +4,8 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [supabase-production-migration]
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   mobile-web-build:
