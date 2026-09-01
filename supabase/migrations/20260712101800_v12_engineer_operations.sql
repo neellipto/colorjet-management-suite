@@ -326,6 +326,10 @@ declare
   v_old_status text;
   v_allowed boolean := false;
 begin
+  if auth.uid() is null then
+    raise exception 'Authentication required';
+  end if;
+
   select * into v_visit
   from public.v12_customer_visits
   where id = p_visit_id
@@ -405,6 +409,10 @@ declare
   v_visit public.v12_customer_visits;
   v_session_id uuid;
 begin
+  if auth.uid() is null then
+    raise exception 'Authentication required';
+  end if;
+
   select * into v_visit from public.v12_customer_visits where id = p_visit_id;
   if not found then raise exception 'Visit not found'; end if;
 
@@ -710,6 +718,10 @@ grant select, insert, update on public.v12_parts_dispatch_items to authenticated
 grant select, insert, update on public.v12_sla_rules to authenticated;
 grant select, insert, update on public.v12_sla_events to authenticated;
 grant select, insert, update on public.v12_offline_mutations to authenticated;
+revoke execute on function public.v12_transition_visit(uuid,text,text,double precision,double precision,double precision,text,text) from public;
+revoke execute on function public.v12_start_tracking_session(uuid,text,double precision,double precision) from public;
+revoke execute on function public.v12_append_location(uuid,double precision,double precision,double precision,double precision,double precision,double precision,boolean,timestamptz,text,numeric,text,jsonb) from public;
+revoke execute on function public.v12_stop_tracking_session(uuid,double precision,double precision) from public;
 grant execute on function public.v12_transition_visit(uuid,text,text,double precision,double precision,double precision,text,text) to authenticated;
 grant execute on function public.v12_start_tracking_session(uuid,text,double precision,double precision) to authenticated;
 grant execute on function public.v12_append_location(uuid,double precision,double precision,double precision,double precision,double precision,double precision,boolean,timestamptz,text,numeric,text,jsonb) to authenticated;
