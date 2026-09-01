@@ -1,9 +1,9 @@
-name: Build COLORJET Reference UI V17.1
+name: Build COLORJET Business Management Suite Recovery 1.7.3
 
 on:
   push:
     branches:
-      - fix/reference-apk-ui-1702
+      - codex/recover-business-management-suite-1722
   pull_request:
     branches:
       - main
@@ -14,8 +14,8 @@ permissions:
 
 env:
   SOURCE_DIR: artifacts/mobile
-  APP_VERSION: 1.7.1
-  ANDROID_VERSION_CODE: '1702'
+  APP_VERSION: 1.7.3
+  ANDROID_VERSION_CODE: '1722'
   ANDROID_PACKAGE: com.colorjetbd.managementsuite
 
 jobs:
@@ -43,10 +43,10 @@ jobs:
           const app = JSON.parse(fs.readFileSync('artifacts/mobile/app.json', 'utf8')).expo;
           const pkg = JSON.parse(fs.readFileSync('artifacts/mobile/package.json', 'utf8'));
           const failures = [];
-          if (app.name !== 'COLORJET Management Suite') failures.push(`name=${app.name}`);
+          if (app.name !== 'COLORJET Business Management Suite') failures.push(`name=${app.name}`);
           if (app.android?.package !== 'com.colorjetbd.managementsuite') failures.push(`package=${app.android?.package}`);
-          if (app.version !== '1.7.1') failures.push(`version=${app.version}`);
-          if (app.android?.versionCode !== 1702) failures.push(`versionCode=${app.android?.versionCode}`);
+          if (app.version !== '1.7.3') failures.push(`version=${app.version}`);
+          if (app.android?.versionCode !== 1722) failures.push(`versionCode=${app.android?.versionCode}`);
           if (pkg.dependencies?.['@workspace/api-client-react']) failures.push('workspace dependency remains');
           if (JSON.stringify(app).toLowerCase().includes('replit')) failures.push('Replit origin remains');
           if (failures.length) throw new Error(failures.join('\n'));
@@ -74,9 +74,9 @@ jobs:
       matrix:
         include:
           - profile: preview
-            filename: COLORJET_MANAGEMENT_SUITE_REFERENCE_UI_V17_1_SIGNED.apk
+            filename: COLORJET_BUSINESS_MANAGEMENT_SUITE_RECOVERY_1_7_3_SIGNED.apk
           - profile: production
-            filename: COLORJET_MANAGEMENT_SUITE_REFERENCE_UI_V17_1_SIGNED.aab
+            filename: COLORJET_BUSINESS_MANAGEMENT_SUITE_RECOVERY_1_7_3_SIGNED.aab
 
     steps:
       - name: Checkout correction branch
@@ -105,8 +105,8 @@ jobs:
           node <<'NODE'
           const fs = require('fs');
           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          pkg.name = 'colorjet-management-suite';
-          pkg.version = '1.7.1';
+          pkg.name = 'colorjet-business-management-suite';
+          pkg.version = '1.7.3';
           pkg.packageManager = 'npm@10.8.2';
           pkg.dependencies = {
             '@babel/runtime': '^7.26.0',
@@ -209,7 +209,7 @@ jobs:
           git config user.name 'COLORJET Build Bot'
           git config user.email 'colorjet-build@users.noreply.github.com'
           git add -A
-          git commit --quiet -m 'COLORJET reference UI V17.1 build snapshot'
+          git commit --quiet -m 'COLORJET Business Management Suite recovery 1.7.3 build snapshot'
 
       - name: Queue and wait for signed EAS build
         working-directory: work
@@ -242,7 +242,7 @@ jobs:
       - name: Upload signed reference UI artifact
         uses: actions/upload-artifact@v4
         with:
-          name: COLORJET-REFERENCE-UI-V17-1-${{ matrix.profile }}-SIGNED
+          name: COLORJET-BUSINESS-MANAGEMENT-SUITE-RECOVERY-1-7-3-${{ matrix.profile }}-SIGNED
           path: |
             work/${{ matrix.filename }}
             work/${{ matrix.filename }}.sha256
