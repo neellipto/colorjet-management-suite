@@ -1,14 +1,12 @@
 # COLORJET ERP Production Deployment
 
-This mobile/web application uses Supabase Auth and the COLORJET production database.
+This mobile/web application authenticates and exchanges business data only through the COLORJET ERP API.
 
-## Required deployment variables
+## Required deployment variable
 
-- `EXPO_PUBLIC_SUPABASE_URL`
-- `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-- `EXPO_PUBLIC_PASSWORD_RESET_REDIRECT`
+- `EXPO_PUBLIC_ERP_API_BASE_URL`
 
-Use Vercel project settings to store these values for Preview and Production. Never commit a database password, Supabase service-role key, employee password, or temporary password.
+Never commit database credentials, employee passwords, access tokens, or refresh tokens.
 
 ## Vercel
 
