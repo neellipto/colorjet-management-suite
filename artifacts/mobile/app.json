@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "COLORJET Management Suite",
-    "slug": "colorjet-management-suite",
-    "version": "1.7.1",
+    "name": "COLORJET Business Management Suite",
+    "slug": "colorjet-business-management-suite",
+    "version": "1.7.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "colorjet-erp",
@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "com.colorjetbd.managementsuite",
-      "versionCode": 1702,
+      "versionCode": 1722,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#1A237E"

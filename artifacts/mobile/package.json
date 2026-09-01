@@ -1,6 +1,6 @@
 {
-  "name": "colorjet-management-suite",
-  "version": "1.7.1",
+  "name": "colorjet-business-management-suite",
+  "version": "1.7.3",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
