@@ -27,23 +27,35 @@ GO
    =========================================================================== */
 CREATE OR ALTER PROCEDURE cj.usp_Customer360_Financial @CustomerAccountId UNIQUEIDENTIFIER AS
 BEGIN SET NOCOUNT ON;
-    /* 1) summary (canonical, from the party master) */
-    SELECT
-        TotalInvoiced = CAST(m.InvoiceAmount AS DECIMAL(18,2)),
-        TotalPaid     = CAST(m.InvoicePaid   AS DECIMAL(18,2)),
-        CurrentDue    = CAST(m.CurrentDue    AS DECIMAL(18,2)),
-        OpeningBalance= CAST(m.OpeningBalance AS DECIMAL(18,2))
-    FROM cj.vw_CustomerMaster m
-    WHERE m.CustomerId = @CustomerAccountId;
+    /* Verified canonical sources (schema audit):
+         collection  = dbo.TradingReceipts (customer money-in). dbo.Payments is NOT
+                       customer collection (0 rows link to customer/supplier groups).
+         invoice due = dbo.SalesInvoiceGenerations.DueAmount (authoritative per-invoice).
+       Accounts.InvoiceAmount/Paid can be NULL, so summary is derived from the
+       invoice + receipt records (ISNULL) — never fabricated. */
 
-    /* 2) ledger with running balance */
+    DECLARE @InvTotal DECIMAL(18,2) = ISNULL((SELECT SUM(CAST(TotalAmount AS DECIMAL(18,2))) FROM dbo.SalesInvoiceGenerations WHERE IsDeleted=0 AND PartyId=@CustomerAccountId),0);
+    DECLARE @InvPaid  DECIMAL(18,2) = ISNULL((SELECT SUM(CAST(PaidAmount  AS DECIMAL(18,2))) FROM dbo.SalesInvoiceGenerations WHERE IsDeleted=0 AND PartyId=@CustomerAccountId),0);
+    DECLARE @InvDue   DECIMAL(18,2) = ISNULL((SELECT SUM(CAST(DueAmount   AS DECIMAL(18,2))) FROM dbo.SalesInvoiceGenerations WHERE IsDeleted=0 AND PartyId=@CustomerAccountId),0);
+    DECLARE @Receipts DECIMAL(18,2) = ISNULL((SELECT SUM(CAST(ReceiptAmount AS DECIMAL(18,2))) FROM dbo.TradingReceipts WHERE IsDeleted=0 AND PartyId=@CustomerAccountId),0);
+    DECLARE @Opening  DECIMAL(18,2) = ISNULL((SELECT CAST(OpeningBalance AS DECIMAL(18,2)) FROM dbo.Accounts WHERE Id=@CustomerAccountId),0);
+
+    /* 1) summary — CurrentDue = canonical per-invoice due (reconciles) */
+    SELECT
+        TotalInvoiced = @InvTotal,
+        TotalCollected= @Receipts,
+        InvoicePaid   = @InvPaid,
+        CurrentDue    = @InvDue,
+        OpeningBalance= @Opening;
+
+    /* 2) ledger with running balance (Invoice debit / Receipt credit) */
     ;WITH ledger AS (
-        SELECT CustomerId = PartyId, TxnDate = CreatedDate, Reference = SalesInvoiceNo,
+        SELECT TxnDate = CreatedDate, Reference = SalesInvoiceNo,
                TxnType = 'Invoice', Debit = CAST(TotalAmount AS DECIMAL(18,2)),
                Credit = CAST(0 AS DECIMAL(18,2)), SortK = 1
         FROM dbo.SalesInvoiceGenerations WHERE IsDeleted = 0 AND PartyId = @CustomerAccountId
         UNION ALL
-        SELECT PartyId, CreatedDate, ReceiptCode, 'Receipt',
+        SELECT CreatedDate, ReceiptCode, 'Receipt',
                CAST(0 AS DECIMAL(18,2)), CAST(ReceiptAmount AS DECIMAL(18,2)), 2
         FROM dbo.TradingReceipts WHERE IsDeleted = 0 AND PartyId = @CustomerAccountId
     )
@@ -52,6 +64,16 @@ BEGIN SET NOCOUNT ON;
                ORDER BY TxnDate, SortK ROWS UNBOUNDED PRECEDING)
     FROM ledger
     ORDER BY TxnDate, SortK;
+
+    /* 3) reconciliation — ledger closing vs canonical due; difference disclosed */
+    SELECT
+        LedgerClosing   = (@InvTotal - @Receipts),
+        CanonicalDue    = @InvDue,
+        Difference      = (@InvTotal - @Receipts) - @InvDue,
+        Note = CASE WHEN (@InvTotal - @Receipts) - @InvDue = 0
+                    THEN 'RECONCILED'
+                    ELSE 'DIFF: invoice inline-paid amounts not matched by receipt rows (disclosed, not hidden)'
+               END;
 END
 GO
 

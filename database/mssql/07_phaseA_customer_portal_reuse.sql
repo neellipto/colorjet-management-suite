@@ -42,7 +42,7 @@ BEGIN
     CREATE TABLE cj.CustomerPortalAccounts
     (
         Id                UNIQUEIDENTIFIER NOT NULL CONSTRAINT DF_cpa_id DEFAULT NEWSEQUENTIALID(),
-        UserId            NVARCHAR(900)    NOT NULL,   -- FK dbo.AspNetUsers.Id (the login)
+        UserId            NVARCHAR(450)    NOT NULL,   -- FK dbo.AspNetUsers.Id (nvarchar(450) — must match exactly)
         CustomerAccountId UNIQUEIDENTIFIER NOT NULL,   -- FK dbo.Accounts.Id (canonical customer)
         Status            VARCHAR(24)      NOT NULL CONSTRAINT DF_cpa_status DEFAULT ('ACTIVE'),
         AllowedPermissions NVARCHAR(MAX)   NULL,       -- optional portal-scoped permission set (JSON)
@@ -130,10 +130,10 @@ CREATE OR ALTER VIEW cj.vw_CustomerMaster AS
         ThanaId      = a.ThanaId,
         CustomerType = a.CustomerType,
         SalesEmployeeId = a.EmployeeId,
-        OpeningBalance  = a.OpeningBalance,
-        InvoiceAmount   = a.InvoiceAmount,
-        InvoicePaid     = a.InvoicePaid,
-        CurrentDue      = (a.InvoiceAmount - a.InvoicePaid),
+        OpeningBalance  = ISNULL(a.OpeningBalance,0),
+        InvoiceAmount   = ISNULL(a.InvoiceAmount,0),
+        InvoicePaid     = ISNULL(a.InvoicePaid,0),
+        CurrentDue      = (ISNULL(a.InvoiceAmount,0) - ISNULL(a.InvoicePaid,0)),
         BranchId     = a.BranchId,
         GroupId      = a.GroupId,
         GroupName    = g.Name,
@@ -172,9 +172,11 @@ GO
 CREATE OR ALTER PROCEDURE cj.usp_Customer360_Header @CustomerAccountId UNIQUEIDENTIFIER AS
 BEGIN SET NOCOUNT ON;
     SELECT
-        m.CustomerId, m.Code, m.Name, m.Mobile, m.Email, m.Address, m.CustomerType,
-        TotalInvoiced = m.InvoiceAmount, TotalPaid = m.InvoicePaid, CurrentDue = m.CurrentDue,
-        m.BranchId,
+        m.CustomerId, m.Code, m.Name, m.Mobile, m.Email, m.Address, m.CustomerType, m.BranchId,
+        /* derived from real invoices/receipts — Accounts.InvoiceAmount can be NULL */
+        TotalInvoiced = ISNULL((SELECT SUM(CAST(TotalAmount AS DECIMAL(18,2))) FROM dbo.SalesInvoiceGenerations WHERE IsDeleted=0 AND PartyId=m.CustomerId),0),
+        TotalPaid     = ISNULL((SELECT SUM(CAST(ReceiptAmount AS DECIMAL(18,2))) FROM dbo.TradingReceipts WHERE IsDeleted=0 AND PartyId=m.CustomerId),0),
+        CurrentDue    = ISNULL((SELECT SUM(CAST(DueAmount AS DECIMAL(18,2))) FROM dbo.SalesInvoiceGenerations WHERE IsDeleted=0 AND PartyId=m.CustomerId),0),
         OpenTickets = (SELECT COUNT(*) FROM cj.ServiceTickets t
                        WHERE t.CustomerId = m.CustomerId AND t.IsDeleted = 0
                          AND t.Status NOT IN ('CLOSED','CANCELLED')),
