@@ -1,4 +1,4 @@
-package com.colorjetbd.managementsuite;
+package com.colorjetbd.erp;
 
 import android.Manifest;
 import android.app.Activity;
