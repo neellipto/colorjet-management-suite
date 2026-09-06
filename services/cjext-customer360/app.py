@@ -51,8 +51,12 @@ def get_conn():
     return pyodbc.connect(CONN_STR, timeout=10)
 
 
+def _camel(col_name):
+    return col_name[:1].lower() + col_name[1:] if col_name else col_name
+
+
 def rows_as_dicts(cursor):
-    columns = [col[0] for col in cursor.description]
+    columns = [_camel(col[0]) for col in cursor.description]
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 
