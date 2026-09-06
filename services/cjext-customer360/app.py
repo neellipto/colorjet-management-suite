@@ -73,10 +73,10 @@ def health():
     return jsonify({"status": "ok"})
 
 
-def _exec_single_set(proc_name, customer_account_id):
+def _exec_single_set(proc_name, param_value):
     with get_conn() as conn:
         cursor = conn.cursor()
-        cursor.execute(f"EXEC {proc_name} @CustomerAccountId=?", customer_account_id)
+        cursor.execute(f"EXEC {proc_name} ?", param_value)
         return rows_as_dicts(cursor)
 
 
@@ -133,6 +133,22 @@ def financial(customer_account_id):
             "reconciliation": reconciliation_rows[0] if reconciliation_rows else None,
         }
     )
+
+
+@app.get("/engineer/<engineer_id>/header")
+def engineer_header(engineer_id):
+    rows = _exec_single_set("cj.usp_Engineer360_Header", engineer_id)
+    return jsonify(rows[0] if rows else None)
+
+
+@app.get("/engineer/<engineer_id>/tickets")
+def engineer_tickets(engineer_id):
+    return jsonify(_exec_single_set("cj.usp_Engineer360_Tickets", engineer_id))
+
+
+@app.get("/engineer/<engineer_id>/parts")
+def engineer_parts(engineer_id):
+    return jsonify(_exec_single_set("cj.usp_Engineer360_Parts", engineer_id))
 
 
 if __name__ == "__main__":
