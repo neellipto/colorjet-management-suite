@@ -18,6 +18,7 @@
    Apply into COLORJET_ERP AFTER 07_phaseA_customer_portal_reuse.sql. Idempotent.
    ============================================================================= */
 SET NOCOUNT ON;
+SET QUOTED_IDENTIFIER ON;
 GO
 
 /* ===========================================================================
