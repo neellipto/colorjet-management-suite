@@ -5,8 +5,14 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
 echo "[health] static readiness checks"
-grep -q "if (req.url === '/status')" artifacts/mobile/server/serve.js
-grep -q "@app.get(\"/health\")" services/cjext-customer360/app.py
+if ! grep -qiE "req\\.url\\s*===\\s*['\"]/status['\"]" artifacts/mobile/server/serve.js; then
+  echo "ERROR: /status handler not found in artifacts/mobile/server/serve.js"
+  exit 1
+fi
+if ! grep -qiE "@app\\.(get|route)\\(['\"]/health['\"]" services/cjext-customer360/app.py; then
+  echo "ERROR: /health route not found in services/cjext-customer360/app.py"
+  exit 1
+fi
 
 if [[ -n "${STATIC_SERVER_URL:-}" ]]; then
   echo "[health] probing static server: ${STATIC_SERVER_URL}/status"

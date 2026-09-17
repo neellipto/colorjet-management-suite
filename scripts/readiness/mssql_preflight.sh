@@ -22,9 +22,12 @@ grep -q '05_identity_rbac_portal.sql' database/mssql/AUDIT_FINDINGS.md
 grep -q '06_phaseA_customer_module.sql' database/mssql/AUDIT_FINDINGS.md
 
 echo "[mssql-preflight] verifying report DB role policy (writer no DELETE, reader SELECT-only)"
-grep -q 'CREATE ROLE colorjet_sync_writer' database/mssql/03_security.sql
-grep -q 'CREATE ROLE colorjet_app_reader' database/mssql/03_security.sql
-grep -q 'DENY  DELETE' database/mssql/03_security.sql
-grep -q 'GRANT SELECT' database/mssql/03_security.sql
+grep -qiE 'CREATE[[:space:]]+ROLE[[:space:]]+colorjet_sync_writer' database/mssql/03_security.sql
+grep -qiE 'CREATE[[:space:]]+ROLE[[:space:]]+colorjet_app_reader' database/mssql/03_security.sql
+grep -qiP '^\s*GRANT\s+(?=[^;]*\bSELECT\b)(?=[^;]*\bINSERT\b)(?=[^;]*\bUPDATE\b)[^;]*\bON\s+SCHEMA::report\b[^;]*\bTO\s+colorjet_sync_writer\b' database/mssql/03_security.sql
+grep -qiP '^\s*DENY\s+DELETE\b[^;]*\bON\s+SCHEMA::report\b[^;]*\bTO\s+colorjet_sync_writer\b' database/mssql/03_security.sql
+
+grep -qiP '^\s*GRANT\s+SELECT\b[^;]*\bON\s+SCHEMA::report\b[^;]*\bTO\s+colorjet_app_reader\b' database/mssql/03_security.sql
+grep -qiP '^\s*DENY\s+(?=[^;]*\bINSERT\b)(?=[^;]*\bUPDATE\b)(?=[^;]*\bDELETE\b)[^;]*\bON\s+SCHEMA::report\b[^;]*\bTO\s+colorjet_app_reader\b' database/mssql/03_security.sql
 
 echo "[mssql-preflight] PASS"

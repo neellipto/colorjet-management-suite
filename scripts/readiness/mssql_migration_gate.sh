@@ -31,11 +31,31 @@ for sql_file in "$@"; do
     exit 1
   fi
 
-  base="$(basename "$sql_file")"
-  if [[ "$base" == "05_identity_rbac_portal.sql" || "$base" == "06_phaseA_customer_module.sql" ]]; then
-    echo "ERROR: $base is superseded and must not be deployed to canonical ERP."
+  if [[ ! "$sql_file" =~ ^database/mssql/.*\.sql$ ]]; then
+    echo "ERROR: migration files must be SQL files under database/mssql: $sql_file"
     exit 1
   fi
+
+  case "$sql_file" in
+    database/mssql/01_schema.sql|\
+    database/mssql/02_views.sql|\
+    database/mssql/03_security.sql|\
+    database/mssql/04_owner_dashboard_mapping.sql|\
+    database/mssql/07_phaseA_customer_portal_reuse.sql|\
+    database/mssql/08_phaseA_360_tabs.sql|\
+    database/mssql/09_customer360_readonly_login.sql|\
+    database/mssql/10_phaseB_engineer360_reuse.sql|\
+    database/mssql/11_product_master_contact_import.sql)
+      ;;
+    database/mssql/05_identity_rbac_portal.sql|database/mssql/06_phaseA_customer_module.sql)
+      echo "ERROR: $sql_file is superseded and must not be deployed to canonical ERP."
+      exit 1
+      ;;
+    *)
+      echo "ERROR: $sql_file is not in the approved migration allowlist."
+      exit 1
+      ;;
+  esac
 done
 
 echo "[migration-gate] PASS for ${target_env}"

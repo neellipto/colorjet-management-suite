@@ -11,9 +11,12 @@ on:
           - staging
           - production
       script_bundle:
-        description: "Space-separated SQL scripts to validate"
+        description: "Newline-separated SQL scripts to validate"
         required: true
-        default: "database/mssql/01_schema.sql database/mssql/02_views.sql database/mssql/03_security.sql"
+        default: |
+          database/mssql/01_schema.sql
+          database/mssql/02_views.sql
+          database/mssql/03_security.sql
       production_approved:
         description: "Explicitly approve production migration gate"
         required: false
@@ -27,7 +30,8 @@ permissions:
   contents: read
 
 jobs:
-  preflight:
+  staging-migration-gate:
+    if: ${{ inputs.target_env == 'staging' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,15 +45,43 @@ jobs:
           PRODUCTION_CHANGE_TICKET: ${{ inputs.production_change_ticket }}
           SCRIPT_BUNDLE: ${{ inputs.script_bundle }}
         run: |
-          read -r -a scripts <<< "$SCRIPT_BUNDLE"
-          ./scripts/readiness/mssql_migration_gate.sh "$TARGET_ENV" "${scripts[@]}"
+          mapfile -t scripts <<< "$SCRIPT_BUNDLE"
+          cleaned=()
+          for script in "${scripts[@]}"; do
+            [[ -n "${script// }" ]] || continue
+            cleaned+=("$script")
+          done
+          if [[ "${#cleaned[@]}" -eq 0 ]]; then
+            echo "ERROR: script_bundle must contain at least one SQL file."
+            exit 1
+          fi
+          ./scripts/readiness/mssql_migration_gate.sh "$TARGET_ENV" "${cleaned[@]}"
 
-  production-approval:
+  production-migration-gate:
     if: ${{ inputs.target_env == 'production' }}
-    needs: preflight
     runs-on: ubuntu-latest
     environment:
       name: production
     steps:
-      - name: Approval gate reached
-        run: echo "Production migration approval gate satisfied."
+      - uses: actions/checkout@v4
+      - name: MSSQL static preflight
+        run: ./scripts/readiness/mssql_preflight.sh
+      - name: Environment migration gate
+        shell: bash
+        env:
+          TARGET_ENV: ${{ inputs.target_env }}
+          PRODUCTION_APPROVED: ${{ inputs.production_approved && 'YES' || 'NO' }}
+          PRODUCTION_CHANGE_TICKET: ${{ inputs.production_change_ticket }}
+          SCRIPT_BUNDLE: ${{ inputs.script_bundle }}
+        run: |
+          mapfile -t scripts <<< "$SCRIPT_BUNDLE"
+          cleaned=()
+          for script in "${scripts[@]}"; do
+            [[ -n "${script// }" ]] || continue
+            cleaned+=("$script")
+          done
+          if [[ "${#cleaned[@]}" -eq 0 ]]; then
+            echo "ERROR: script_bundle must contain at least one SQL file."
+            exit 1
+          fi
+          ./scripts/readiness/mssql_migration_gate.sh "$TARGET_ENV" "${cleaned[@]}"

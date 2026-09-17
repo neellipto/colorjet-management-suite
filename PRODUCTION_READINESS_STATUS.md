@@ -56,7 +56,7 @@ Status: **NOT READY**
 | `./scripts/readiness/health_readiness.sh` | PASSED |
 | `python3 -m py_compile services/cjext-customer360/app.py` | PASSED |
 | `corepack enable && pnpm --version` | PASSED |
-| `pnpm install --frozen-lockfile` | FAILED (lockfile drift) |
+| `pnpm install --frozen-lockfile` | PASSED |
 | `pnpm install --no-frozen-lockfile` | PASSED |
 | `pnpm --filter @workspace/mobile run typecheck` | PASSED |
 | `pnpm --filter @workspace/mobile run build` | PASSED |
