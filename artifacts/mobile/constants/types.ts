@@ -119,6 +119,7 @@ export type TicketStatus =
   | 'accepted'
   | 'on_the_way'
   | 'in_progress'
+  | 'paused'
   | 'waiting_parts'
   | 'pending_customer'
   | 'revisit'

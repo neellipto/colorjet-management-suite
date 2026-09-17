@@ -4,7 +4,7 @@
 - 2026-06-18 UTC
 
 ## Current status
-No application code was found, so exact required environment variables cannot be confirmed from source.
+Application code exists for the mobile client and the internal customer360 service, but the full canonical ERP backend source is not present in this repository.
 
 This file documents the expected secure environment baseline for a COLORJET ERP / backend / Odoo sync deployment. Use placeholders only. Do not commit real secrets.
 

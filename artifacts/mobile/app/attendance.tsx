@@ -71,7 +71,7 @@ export default function AttendanceScreen() {
       <View>
         <Text style={[styles.eyebrow, { color: colors.primary }]}>MY WORKDAY</Text>
         <Text style={[styles.title, { color: colors.foreground }]}>Attendance</Text>
-        <Text style={[styles.help, { color: colors.mutedForeground }]}>{user?.displayName ?? user?.username ?? 'Employee'} · your own ERP attendance record</Text>
+        <Text style={[styles.help, { color: colors.mutedForeground }]}>{user?.displayName ?? user?.email ?? 'Employee'} · your own ERP attendance record</Text>
       </View>
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.statusRow}>

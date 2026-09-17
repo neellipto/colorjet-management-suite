@@ -4,7 +4,7 @@
 - 2026-06-18 UTC
 
 ## Current reality
-This repository currently contains no runnable ERP/backend/frontend/Odoo sync source code. It appears to be a placeholder repository.
+This repository contains runnable mobile/PWA source and an internal read-only customer360 service, but it does not yet contain the full canonical ERP backend/API implementation required for production sign-off.
 
 ## Immediate priority
 Do not create a new project over this repository. First restore or add the actual existing COLORJET ERP / Odoo sync source code into this Git branch.
