@@ -8,7 +8,25 @@ on:
   workflow_dispatch:
 
 jobs:
+  safety-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Secret and MSSQL safety guard
+        shell: bash
+        run: ./scripts/readiness/secret_and_mssql_guard.sh
+      - name: MSSQL preflight
+        shell: bash
+        run: ./scripts/readiness/mssql_preflight.sh
+      - name: Runtime health/readiness scaffold checks
+        shell: bash
+        run: ./scripts/readiness/health_readiness.sh
+      - name: Customer360 syntax check
+        shell: bash
+        run: python3 -m py_compile services/cjext-customer360/app.py
+
   mobile-web-build:
+    needs: safety-preflight
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -4,9 +4,16 @@
 - 2026-06-18 UTC
 
 ## Current deployability
-Current status: **NOT DEPLOYABLE**
+Current status: **PARTIAL / NOT READY FOR PRODUCTION**
 
-Reason: this repository does not contain application source code, runtime manifests, backend entrypoints, frontend assets, database migrations, or deployment configuration.
+This repository now contains deployable source for:
+- `artifacts/mobile` (Expo mobile/PWA client + static export)
+- `services/cjext-customer360` (internal read-only Flask adapter)
+- `database/mssql` reporting and portal SQL scripts
+
+Hard blocker: canonical full ERP backend/API source for critical online-only business posting is not available in this repository, so end-to-end production deployment is blocked.
+
+See `PRODUCTION_READINESS_STATUS.md` for the latest audit evidence and blockers.
 
 ## Required production deployment target
 For COLORJET ERP / mobile backend / Odoo sync workloads, the production target should be a backend-capable environment such as the existing VPS.

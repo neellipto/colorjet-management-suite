@@ -7,7 +7,12 @@
 The repository was inspected for application source, route definitions, API controllers, pages, and deployment entrypoints.
 
 ## Result
-No routes or API endpoints can be verified because no application source code is present.
+This historical file is superseded by `PRODUCTION_READINESS_STATUS.md`.
+
+Current repository verification confirms:
+- `services/cjext-customer360/app.py` exposes `/health` and internal read endpoints.
+- `artifacts/mobile/server/serve.js` exposes `/status` for static-serving health checks.
+- Full canonical ERP authenticated API implementation is still blocked in this repository.
 
 ## Route files found
 None.

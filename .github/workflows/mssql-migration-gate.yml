@@ -1,0 +1,55 @@
+name: MSSQL Migration Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      script_bundle:
+        description: "Space-separated SQL scripts to validate"
+        required: true
+        default: "database/mssql/01_schema.sql database/mssql/02_views.sql database/mssql/03_security.sql"
+      production_approved:
+        description: "Explicitly approve production migration gate"
+        required: false
+        type: boolean
+        default: false
+      production_change_ticket:
+        description: "Production change ticket/reference (required for production)"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: MSSQL static preflight
+        run: ./scripts/readiness/mssql_preflight.sh
+      - name: Environment migration gate
+        shell: bash
+        env:
+          TARGET_ENV: ${{ inputs.target_env }}
+          PRODUCTION_APPROVED: ${{ inputs.production_approved && 'YES' || 'NO' }}
+          PRODUCTION_CHANGE_TICKET: ${{ inputs.production_change_ticket }}
+          SCRIPT_BUNDLE: ${{ inputs.script_bundle }}
+        run: |
+          read -r -a scripts <<< "$SCRIPT_BUNDLE"
+          ./scripts/readiness/mssql_migration_gate.sh "$TARGET_ENV" "${scripts[@]}"
+
+  production-approval:
+    if: ${{ inputs.target_env == 'production' }}
+    needs: preflight
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    steps:
+      - name: Approval gate reached
+        run: echo "Production migration approval gate satisfied."

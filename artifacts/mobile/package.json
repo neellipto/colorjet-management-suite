@@ -1,5 +1,5 @@
 {
-  "name": "colorjet-management-suite",
+  "name": "@workspace/mobile",
   "version": "1.7.2",
   "private": true,
   "main": "expo-router/entry",
@@ -9,6 +9,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "build": "node ./scripts/build.js",
     "typecheck": "tsc --noEmit",
     "validate:android": "expo config --type public && expo-doctor && tsc --noEmit",
     "export:android": "expo export --platform android --output-dir dist-android"

@@ -3,3 +3,11 @@ __pycache__/
 *.pyo
 .venv/
 venv/
+node_modules/
+artifacts/mobile/node_modules/
+artifacts/mobile/static-build/
+*.apk
+*.aab
+android-v11.3-native/.gradle/
+apk-wrapper/.gradle/
+field-service-mobile/.gradle/
