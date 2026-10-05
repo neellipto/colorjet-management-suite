@@ -1,5 +1,5 @@
 {
-  "name": "colorjet-business-management-suite",
+  "name": "@workspace/mobile",
   "version": "1.7.3",
   "private": true,
   "main": "expo-router/entry",
