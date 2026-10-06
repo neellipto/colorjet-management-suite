@@ -6,6 +6,8 @@ import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View }
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Badge } from '@/components/Badge';
 import { useApp } from '@/context/AppContext';
+import { useErpRuntime } from '@/context/ErpRuntimeContext';
+import { can } from '@/lib/effectivePermissions';
 import { useColors } from '@/hooks/useColors';
 
 interface MenuItemProps {
@@ -48,6 +50,7 @@ export default function MoreScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { currentUser, logout, notifications, products } = useApp();
+  const { permissions: erpPermissions } = useErpRuntime();
   const role = currentUser?.role ?? 'customer';
   const isAdmin = role === 'admin' || role === 'manager';
   const isAccounts = role === 'accounts';
@@ -55,6 +58,8 @@ export default function MoreScreen() {
   const isEngineer = role === 'engineer';
   const isStore = role === 'store';
   const isServiceControl = role === 'service_control';
+  const isOwner = Boolean(erpPermissions?.isOwner);
+  const canViewManualRegisters = isOwner || can(erpPermissions, 'manual_registers', 'view');
 
   const lowStockCount = products.filter(p => p.currentStock < p.minStockQty).length;
   const unread = notifications.filter(n => !n.isRead).length;
@@ -75,7 +80,6 @@ export default function MoreScreen() {
       contentContainerStyle={{ paddingTop: pt + 16, paddingBottom: pb, paddingHorizontal: 16, gap: 8 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* User Card */}
       <View style={[styles.userCard, { backgroundColor: colors.primary }]}>
         <View style={[styles.userAvatar, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
           <Feather name="user" size={24} color="#fff" />
@@ -83,13 +87,18 @@ export default function MoreScreen() {
         <View style={styles.userInfo}>
           <Text style={styles.userName}>{currentUser?.name}</Text>
           <Text style={styles.userRole}>{role.charAt(0).toUpperCase() + role.slice(1)} · COLORJET Bangladesh</Text>
-          {currentUser?.employeeCode ? (
-            <Text style={styles.userCode}>{currentUser.employeeCode}</Text>
-          ) : null}
+          {currentUser?.employeeCode ? <Text style={styles.userCode}>{currentUser.employeeCode}</Text> : null}
         </View>
       </View>
 
-      {/* Admin Control Center */}
+      {isOwner && (
+        <>
+          <SectionLabel label="OWNER CONTROL" />
+          <MenuItem icon="command" label="Owner Command Center" subtitle="Executive KPI, risks and approvals" onPress={() => router.push('/owner-command-center' as any)} iconBg={colors.navyLight} iconColor={colors.primary} />
+          <MenuItem icon="cpu" label="Owner AI" subtitle="Source-backed analysis and confirmed actions" onPress={() => router.push('/owner-ai' as any)} iconBg="#F3E5F5" iconColor="#7B1FA2" />
+        </>
+      )}
+
       {isAdmin && (
         <>
           <SectionLabel label="ADMIN CONTROL CENTER" />
@@ -103,7 +112,13 @@ export default function MoreScreen() {
         </>
       )}
 
-      {/* Service Operations */}
+      {canViewManualRegisters && (
+        <>
+          <SectionLabel label="CUSTOM RECORDS" />
+          <MenuItem icon="clipboard" label="Manual Registers" subtitle="Amount, asset, item and custom records" onPress={() => router.push('/manual-registers' as any)} iconBg="#E8F5E9" iconColor="#2E7D32" />
+        </>
+      )}
+
       {(isAdmin || isServiceControl) && (
         <>
           <SectionLabel label="SERVICE OPERATIONS" />
@@ -112,7 +127,6 @@ export default function MoreScreen() {
         </>
       )}
 
-      {/* Management Section */}
       {(isAdmin || isAccounts) && (
         <>
           <SectionLabel label="MANAGEMENT" />
@@ -122,7 +136,6 @@ export default function MoreScreen() {
         </>
       )}
 
-      {/* Accounts Section */}
       {(isAdmin || isAccounts) && (
         <>
           <SectionLabel label="FINANCE" />
@@ -130,7 +143,6 @@ export default function MoreScreen() {
         </>
       )}
 
-      {/* Service Section */}
       {(isAdmin || isEngineer) && (
         <>
           <SectionLabel label="OPERATIONS" />
@@ -138,7 +150,6 @@ export default function MoreScreen() {
         </>
       )}
 
-      {/* Marketing Section */}
       {isMarketing && (
         <>
           <SectionLabel label="MY TOOLS" />
@@ -147,7 +158,6 @@ export default function MoreScreen() {
         </>
       )}
 
-      {/* Store Section */}
       {isStore && (
         <>
           <SectionLabel label="STORE TOOLS" />
@@ -163,7 +173,9 @@ export default function MoreScreen() {
         </>
       )}
 
-      {/* Notifications */}
+      <SectionLabel label="MY WORKDAY" />
+      <MenuItem icon="clock" label="Attendance" subtitle="Check in, check out and view my history" onPress={() => router.push('/attendance' as any)} iconBg="#E8F5E9" iconColor="#2E7D32" />
+
       <SectionLabel label="NOTIFICATIONS" />
       <MenuItem
         icon="bell"
@@ -175,11 +187,9 @@ export default function MoreScreen() {
         iconColor="#F57F17"
       />
 
-      {/* Account */}
       <SectionLabel label="ACCOUNT" />
       <MenuItem icon="user" label="My Profile" subtitle="View and edit profile" onPress={() => router.push('/profile' as any)} />
 
-      {/* Sign Out */}
       <TouchableOpacity
         style={[styles.logoutBtn, { backgroundColor: '#FFEBEE', borderColor: '#FFCDD2' }]}
         onPress={handleLogout}
@@ -189,7 +199,7 @@ export default function MoreScreen() {
         <Text style={[styles.logoutText, { color: '#C62828' }]}>Sign Out</Text>
       </TouchableOpacity>
 
-      <Text style={[styles.version, { color: colors.mutedForeground }]}>COLORJET ERP v2.0 · Bangladesh</Text>
+      <Text style={[styles.version, { color: colors.mutedForeground }]}>COLORJET Management Suite · Additive Update</Text>
     </ScrollView>
   );
 }

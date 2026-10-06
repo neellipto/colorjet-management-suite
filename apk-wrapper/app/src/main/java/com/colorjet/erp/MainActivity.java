@@ -1,4 +1,4 @@
-package com.colorjet.erp;
+package com.colorjetbd.managementsuite;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -23,7 +23,7 @@ import android.widget.Toast;
 
 public class MainActivity extends Activity {
     private static final int FILE_CHOOSER_REQUEST = 5001;
-    private static final String ERP_HOST = "erp.colorjetbd.com";
+    private static final String ERP_HOST = "erp1.colorjetbd.com";
 
     private WebView webView;
     private ProgressBar loadingIndicator;

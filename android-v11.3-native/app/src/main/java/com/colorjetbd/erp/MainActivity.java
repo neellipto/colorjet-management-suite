@@ -33,7 +33,7 @@ public final class MainActivity extends Activity {
     private static final int FILE_CHOOSER_REQUEST = 5001;
     private static final int LOCATION_PERMISSION_REQUEST = 5101;
     private static final int NOTIFICATION_PERMISSION_REQUEST = 5102;
-    private static final String TRUSTED_HOST = "erp.ept.com.bd";
+    private static final String TRUSTED_HOST = "erp1.colorjetbd.com";
 
     private WebView webView;
     private ProgressBar loadingIndicator;

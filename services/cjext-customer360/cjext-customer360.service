@@ -1,0 +1,19 @@
+[Unit]
+Description=COLORJET ERP - Customer 360 read-only service
+After=network.target
+
+[Service]
+Type=simple
+User=cjext-c360
+Group=cjext-c360
+WorkingDirectory=/opt/cjext-customer360
+EnvironmentFile=/etc/colorjet-cjext-customer360.env
+ExecStart=/opt/cjext-customer360/venv/bin/gunicorn --workers 2 --bind 127.0.0.1:8091 app:app
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/cjext-customer360
+
+[Install]
+WantedBy=multi-user.target

@@ -48,20 +48,13 @@ public final class BackgroundLocationService extends Service implements Location
     public static void start(Context context, String requestedSessionUuid) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String session = requestedSessionUuid;
-        if (session == null || session.trim().isEmpty()) {
-            session = prefs.getString(KEY_SESSION, "");
-        }
-        if (session == null || session.trim().isEmpty()) {
-            session = UUID.randomUUID().toString();
-        }
+        if (session == null || session.trim().isEmpty()) session = prefs.getString(KEY_SESSION, "");
+        if (session == null || session.trim().isEmpty()) session = UUID.randomUUID().toString();
         prefs.edit().putBoolean(KEY_ACTIVE, true).putString(KEY_SESSION, session).apply();
         Intent intent = new Intent(context, BackgroundLocationService.class);
         intent.putExtra(KEY_SESSION, session);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent);
-        } else {
-            context.startService(intent);
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent);
+        else context.startService(intent);
     }
 
     public static void stop(Context context) {
@@ -69,16 +62,14 @@ public final class BackgroundLocationService extends Service implements Location
         context.stopService(new Intent(context, BackgroundLocationService.class));
     }
 
-    @Override
-    public void onCreate() {
+    @Override public void onCreate() {
         super.onCreate();
         createNotificationChannel();
         startForeground(NOTIFICATION_ID, buildNotification());
         locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
     }
 
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
+    @Override public int onStartCommand(Intent intent, int flags, int startId) {
         requestLocationUpdates();
         return START_STICKY;
     }
@@ -89,20 +80,13 @@ public final class BackgroundLocationService extends Service implements Location
             stopSelf();
             return;
         }
-        try {
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, MIN_TIME_MS, MIN_DISTANCE_M, this);
-        } catch (RuntimeException ignored) {
-        }
-        try {
-            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, MIN_TIME_MS, MIN_DISTANCE_M, this);
-        } catch (RuntimeException ignored) {
-        }
+        try { locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, MIN_TIME_MS, MIN_DISTANCE_M, this); }
+        catch (RuntimeException ignored) { }
+        try { locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, MIN_TIME_MS, MIN_DISTANCE_M, this); }
+        catch (RuntimeException ignored) { }
     }
 
-    @Override
-    public void onLocationChanged(Location location) {
-        executor.execute(() -> persistAndSync(location));
-    }
+    @Override public void onLocationChanged(Location location) { executor.execute(() -> persistAndSync(location)); }
 
     private void persistAndSync(Location location) {
         try {
@@ -136,9 +120,7 @@ public final class BackgroundLocationService extends Service implements Location
     }
 
     private void postToServer(String json, String token) {
-        if (token == null || token.trim().isEmpty()) {
-            return;
-        }
+        if (token == null || token.trim().isEmpty()) return;
         HttpURLConnection connection = null;
         try {
             URL url = new URL(getString(R.string.api_base_url) + "/operations/location/ping");
@@ -152,19 +134,13 @@ public final class BackgroundLocationService extends Service implements Location
             connection.setRequestProperty("Authorization", "Bearer " + token);
             byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
             connection.setFixedLengthStreamingMode(bytes.length);
-            try (OutputStream output = connection.getOutputStream()) {
-                output.write(bytes);
-            }
+            try (OutputStream output = connection.getOutputStream()) { output.write(bytes); }
             int code = connection.getResponseCode();
-            if (code < 200 || code >= 300) {
-                Log.w("COLORJET_LOCATION", "Location API returned HTTP " + code);
-            }
+            if (code < 200 || code >= 300) Log.w("COLORJET_LOCATION", "Location API returned HTTP " + code);
         } catch (Exception error) {
             Log.w("COLORJET_LOCATION", "Location sync deferred", error);
         } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
+            if (connection != null) connection.disconnect();
         }
     }
 
@@ -191,29 +167,15 @@ public final class BackgroundLocationService extends Service implements Location
         }
     }
 
-    @Override
-    public void onProviderEnabled(String provider) {
-    }
+    @Override public void onProviderEnabled(String provider) { }
+    @Override public void onProviderDisabled(String provider) { }
+    @Override public void onStatusChanged(String provider, int status, Bundle extras) { }
 
-    @Override
-    public void onProviderDisabled(String provider) {
-    }
-
-    @Override
-    public void onStatusChanged(String provider, int status, Bundle extras) {
-    }
-
-    @Override
-    public void onDestroy() {
-        if (locationManager != null) {
-            locationManager.removeUpdates(this);
-        }
+    @Override public void onDestroy() {
+        if (locationManager != null) locationManager.removeUpdates(this);
         executor.shutdown();
         super.onDestroy();
     }
 
-    @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
+    @Override public IBinder onBind(Intent intent) { return null; }
 }
