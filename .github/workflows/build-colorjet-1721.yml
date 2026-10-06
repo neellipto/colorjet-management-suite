@@ -1,0 +1,256 @@
+name: Build COLORJET Management Suite 1.7.2 (1721)
+
+on:
+  push:
+    branches:
+      - build/colorjet-1721-final
+    paths:
+      - 'artifacts/mobile/**'
+      - '.github/workflows/build-colorjet-1721.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'artifacts/mobile/**'
+      - '.github/workflows/build-colorjet-1721.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: colorjet-management-suite-1721-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate Android identity and Expo config
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: artifacts/mobile
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify locked Android identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const app = JSON.parse(fs.readFileSync('app.json', 'utf8')).expo;
+          const expected = {
+            slug: 'colorjet-app-',
+            package: 'com.colorjetbd.managementsuite',
+            version: '1.7.2',
+            versionCode: 1721,
+            easProjectId: 'ea419f70-a1b3-4265-9e21-5461341ab541',
+          };
+          if (app.slug !== expected.slug) throw new Error(`Slug mismatch: ${app.slug}`);
+          if (app.android?.package !== expected.package) throw new Error(`Package mismatch: ${app.android?.package}`);
+          if (app.version !== expected.version) throw new Error(`Version mismatch: ${app.version}`);
+          if (app.android?.versionCode !== expected.versionCode) throw new Error(`Version code mismatch: ${app.android?.versionCode}`);
+          if (app.extra?.eas?.projectId !== expected.easProjectId) throw new Error(`EAS project mismatch: ${app.extra?.eas?.projectId}`);
+          console.log('Android identity verified:', expected);
+          NODE
+
+      - name: Install dependencies and validate Expo config
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --legacy-peer-deps --no-audit --no-fund
+          npx expo config --type public >/tmp/colorjet-expo-config.json
+
+  build-android:
+    name: Build signed APK and AAB
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN || secrets.EAS_TOKEN }}
+      KEYSTORE_BASE64: ${{ secrets.COLORJET_ANDROID_KEYSTORE_BASE64 || secrets.ANDROID_KEYSTORE_BASE64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.COLORJET_ANDROID_KEYSTORE_PASSWORD || secrets.ANDROID_STORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.COLORJET_ANDROID_KEY_ALIAS || secrets.ANDROID_KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.COLORJET_ANDROID_KEY_PASSWORD || secrets.ANDROID_KEY_PASSWORD }}
+      EXPO_PUBLIC_ERP_API_BASE_URL: https://erp.colorjet.website/api/v1
+      EXPO_PUBLIC_ERP_API_URL: https://erp.colorjet.website/api/v1
+      EXPO_PUBLIC_SUPABASE_URL: https://ljcuhwcyeijfiwpbkdsn.supabase.co
+      EXPO_PUBLIC_AUTH_REDIRECT_URL: https://erp.colorjet.website
+
+    defaults:
+      run:
+        working-directory: artifacts/mobile
+
+    steps:
+      - name: Checkout protected build branch
+        uses: actions/checkout@v4
+        with:
+          ref: build/colorjet-1721-final
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Verify required protected credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${EXPO_TOKEN:-}" || { echo 'Missing EXPO_TOKEN or EAS_TOKEN repository secret'; exit 1; }
+          test -n "${KEYSTORE_BASE64:-}" || { echo 'Missing Android keystore base64 repository secret'; exit 1; }
+          test -n "${KEYSTORE_PASSWORD:-}" || { echo 'Missing Android keystore password repository secret'; exit 1; }
+          test -n "${KEY_ALIAS:-}" || { echo 'Missing Android key alias repository secret'; exit 1; }
+          test -n "${KEY_PASSWORD:-}" || { echo 'Missing Android key password repository secret'; exit 1; }
+
+      - name: Prepare existing production upload key
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > colorjet-upload-release.jks
+          chmod 600 colorjet-upload-release.jks
+          node <<'NODE'
+          const fs = require('fs');
+          const credentials = {
+            android: {
+              keystore: {
+                keystorePath: './colorjet-upload-release.jks',
+                keystorePassword: process.env.KEYSTORE_PASSWORD,
+                keyAlias: process.env.KEY_ALIAS,
+                keyPassword: process.env.KEY_PASSWORD,
+              },
+            },
+          };
+          fs.writeFileSync('credentials.json', JSON.stringify(credentials, null, 2));
+          NODE
+
+      - name: Verify upload certificate fingerprint
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPECTED='F6:2D:0C:16:EE:F0:64:35:70:79:28:D8:11:EE:D3:3A:03:AB:39:15:E5:25:B9:8C:51:1B:27:EE:AA:E2:E8:CB'
+          ACTUAL="$(keytool -list -v \
+            -keystore colorjet-upload-release.jks \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS" 2>/dev/null \
+            | awk -F': ' '/SHA256:/{print $2; exit}')"
+          echo "Upload certificate SHA-256: $ACTUAL"
+          test "$ACTUAL" = "$EXPECTED" || { echo 'Upload certificate fingerprint mismatch'; exit 1; }
+
+      - name: Install mobile dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --legacy-peer-deps --no-audit --no-fund
+          npx expo config --type public >/tmp/colorjet-expo-config.json
+
+      - name: Build signed installable APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx eas-cli@latest build \
+            --platform android \
+            --profile preview \
+            --non-interactive \
+            --wait \
+            --clear-cache \
+            --json > preview-build.json
+
+      - name: Download signed APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="$(node <<'NODE'
+          const fs = require('fs');
+          const data = JSON.parse(fs.readFileSync('preview-build.json', 'utf8'));
+          const urls = [];
+          const walk = value => {
+            if (typeof value === 'string' && /^https:\/\//.test(value)) urls.push(value);
+            else if (Array.isArray(value)) value.forEach(walk);
+            else if (value && typeof value === 'object') Object.values(value).forEach(walk);
+          };
+          walk(data);
+          const url = urls.find(v => /artifacts|\.apk(?:\?|$)/i.test(v));
+          if (!url) throw new Error(`APK artifact URL not found. URLs: ${urls.join(', ')}`);
+          process.stdout.write(url);
+          NODE
+          )"
+          curl --fail --location --retry 3 "$URL" --output COLORJET_MANAGEMENT_SUITE_V17_2_BUILD_1721_SIGNED.apk
+          test -s COLORJET_MANAGEMENT_SUITE_V17_2_BUILD_1721_SIGNED.apk
+          unzip -t COLORJET_MANAGEMENT_SUITE_V17_2_BUILD_1721_SIGNED.apk >/dev/null
+
+      - name: Build signed Play Store AAB
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx eas-cli@latest build \
+            --platform android \
+            --profile production \
+            --non-interactive \
+            --wait \
+            --clear-cache \
+            --json > production-build.json
+
+      - name: Download signed AAB
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="$(node <<'NODE'
+          const fs = require('fs');
+          const data = JSON.parse(fs.readFileSync('production-build.json', 'utf8'));
+          const urls = [];
+          const walk = value => {
+            if (typeof value === 'string' && /^https:\/\//.test(value)) urls.push(value);
+            else if (Array.isArray(value)) value.forEach(walk);
+            else if (value && typeof value === 'object') Object.values(value).forEach(walk);
+          };
+          walk(data);
+          const url = urls.find(v => /artifacts|\.aab(?:\?|$)/i.test(v));
+          if (!url) throw new Error(`AAB artifact URL not found. URLs: ${urls.join(', ')}`);
+          process.stdout.write(url);
+          NODE
+          )"
+          curl --fail --location --retry 3 "$URL" --output COLORJET_MANAGEMENT_SUITE_V17_2_BUILD_1721_SIGNED.aab
+          test -s COLORJET_MANAGEMENT_SUITE_V17_2_BUILD_1721_SIGNED.aab
+          unzip -t COLORJET_MANAGEMENT_SUITE_V17_2_BUILD_1721_SIGNED.aab >/dev/null
+
+      - name: Generate SHA-256 checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum \
+            COLORJET_MANAGEMENT_SUITE_V17_2_BUILD_1721_SIGNED.apk \
+            COLORJET_MANAGEMENT_SUITE_V17_2_BUILD_1721_SIGNED.aab \
+            > COLORJET_MANAGEMENT_SUITE_V17_2_BUILD_1721_SHA256.txt
+
+      - name: Upload signed Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: COLORJET-MANAGEMENT-SUITE-1.7.2-1721-SIGNED
+          path: |
+            artifacts/mobile/COLORJET_MANAGEMENT_SUITE_V17_2_BUILD_1721_SIGNED.apk
+            artifacts/mobile/COLORJET_MANAGEMENT_SUITE_V17_2_BUILD_1721_SIGNED.aab
+            artifacts/mobile/COLORJET_MANAGEMENT_SUITE_V17_2_BUILD_1721_SHA256.txt
+            artifacts/mobile/preview-build.json
+            artifacts/mobile/production-build.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Remove temporary signing files
+        if: always()
+        shell: bash
+        run: |
+          rm -f credentials.json colorjet-upload-release.jks

@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "COLORJET Management Suite",
-    "slug": "colorjet-management-suite",
+    "slug": "colorjet-app-",
     "version": "1.7.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -35,8 +35,6 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-web-browser",
-      "@react-native-community/datetimepicker",
       [
         "expo-secure-store",
         {
