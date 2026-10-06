@@ -1,0 +1,59 @@
+name: Android Single Navigation APK
+
+on:
+  pull_request:
+    paths:
+      - "android-v11.3-native/**"
+      - ".github/workflows/android-single-navigation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-single-navigation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android-v11.3-native
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+      - name: Install image processing dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
+      - name: Generate Android launcher icons from supplied original artwork
+        run: |
+          base64 --decode branding/colorjet-original-launcher.png.b64 > /tmp/colorjet-launcher.png
+          for spec in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
+            density="${spec%%:*}"
+            size="${spec##*:}"
+            mkdir -p "app/src/main/res/mipmap-${density}"
+            convert /tmp/colorjet-launcher.png -resize "${size}x${size}" "app/src/main/res/mipmap-${density}/ic_launcher.png"
+            cp "app/src/main/res/mipmap-${density}/ic_launcher.png" "app/src/main/res/mipmap-${density}/ic_launcher_round.png"
+          done
+      - name: Build clean debug APK
+        run: gradle clean :app:assembleDebug --no-daemon --stacktrace
+      - name: Create checksum
+        run: sha256sum app/build/outputs/apk/debug/app-debug.apk > app/build/outputs/apk/debug/checksums.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: COLORJET-ERP-single-navigation-APK
+          path: |
+            android-v11.3-native/app/build/outputs/apk/debug/app-debug.apk
+            android-v11.3-native/app/build/outputs/apk/debug/checksums.sha256
+          if-no-files-found: error
+          retention-days: 14
